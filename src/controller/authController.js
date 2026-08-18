@@ -101,7 +101,9 @@ AuthController.post('/login', asynchandler(async (req, res) => {
 
     const secretKey = process.env.JWT_SECRET
     const token = jwt.sign(
-        { userId: user._id, email: user.email, role: user.role },
+        { userId: user._id,
+             email: user.email, 
+             role: user.role },
         secretKey,
         { expiresIn: '5m' }
     )

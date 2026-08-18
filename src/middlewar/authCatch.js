@@ -18,6 +18,7 @@ export const verifiveToken = (req, res, next) => {
         const secretKey = process.env.JWT_SECRET
         const decoded = jwt.verify(token, secretKey)
         req.user = decoded
+        
         next()
     } catch (error) {
         return res.status(401).json({ message: 'Invalid or expired token.' })
