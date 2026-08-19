@@ -221,7 +221,7 @@ UserController.put('/sellers/:id/reject', verifiveToken, authorizeRoles('admin')
 }));
 
 
-UserController.put('/seller/:id/suspend',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
+UserController.put('/sellers/:id/suspend',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
 
     const { id } = req.params
     const user = await User.findById(id);

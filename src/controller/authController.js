@@ -52,7 +52,6 @@ AuthController.post('/register', asynchandler(async (req, res) => {
         name: name,
         email: normalizedEmail,
         password: hashPassword,
-
         role: 'customer',
 
         sellerStatus: sellerRequset ? 'pending' : 'none'
