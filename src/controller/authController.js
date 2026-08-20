@@ -99,17 +99,29 @@ AuthController.post('/login', asynchandler(async (req, res) => {
     }
 
     const secretKey = process.env.JWT_SECRET
+    const refressSecretKey=process.env.REFRESS_TOKEN
     const token = jwt.sign(
-        { userId: user._id,
+        {    userId: user._id,
              email: user.email, 
-             role: user.role },
+             role: user.role,
+             sellerStatus: user.sellerStatus },
         secretKey,
         { expiresIn: '5m' }
+    )
+    const tokenRefress=jwt.sign(
+        { userId: user._id,
+             email: user.email, 
+             role: user.role,
+            sellerStatus: user.sellerStatus },
+        refressSecretKey,
+        { expiresIn: '3d' }
+
     )
 
     res.status(200).json({
         message: 'Login successful',
         token,
+        tokenRefress,
         user: {
             id: user._id,
             name: user.name,
