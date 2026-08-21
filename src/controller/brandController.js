@@ -1,7 +1,7 @@
 import express from 'express'
 import asynhandler from 'express-async-handler'
-import { verifiveToken } from '../middlewar/authCatch.js'
-import { authorizeRoles } from '../middlewar/adminCatch.js'
+import { verifiveToken } from '../middlewar/verifyToken.js'
+import { authorizeRoles } from '../middlewar/catchByRole.js'
 import { Brand } from '../model/Brand.js'
 
 const BrandController=express.Router()

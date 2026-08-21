@@ -1,13 +1,8 @@
-import express from 'express'
-import { verifiveToken } from '../middlewar/authCatch.js'
-import { authorizeRoles } from '../middlewar/adminCatch.js'
 import asynchandler from 'express-async-handler'
 import { Category } from '../model/Category.js'
 
-const CategoryController=express.Router()
 
-
-CategoryController.get('/search',asynchandler(async(req,res)=>{
+export const searchCategoty=asynchandler(async(req,res)=>{
 
     const {page=1,limit=10,search}=req.query
     
@@ -25,9 +20,9 @@ CategoryController.get('/search',asynchandler(async(req,res)=>{
     
 
 
-}))
+})
 
-CategoryController.post('/create',verifiveToken,authorizeRoles('admin'),asynchandler(async(req ,res)=>{
+export const createCategory=asynchandler(async(req ,res)=>{
     const {name,image}=req.body
 
     if(!name || !image){
@@ -62,9 +57,10 @@ CategoryController.post('/create',verifiveToken,authorizeRoles('admin'),asynchan
     })
 
 
-}))
+})
 
-CategoryController.get('/:id',asynchandler(async(req,res)=>{
+
+export const getCategoryId=asynchandler(async(req,res)=>{
 
     const {id}=req.params
 
@@ -77,9 +73,9 @@ CategoryController.get('/:id',asynchandler(async(req,res)=>{
 
     return res.json(category)
 
-}))
+})
 
-CategoryController.get('/',asynchandler(async(req,res)=>{
+export const getAllcategory=asynchandler(async(req,res)=>{
 
 
     const category=await Category.find({
@@ -91,9 +87,9 @@ CategoryController.get('/',asynchandler(async(req,res)=>{
 
     return res.json(category)
 
-}))
+})
 
-CategoryController.delete('/:id',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
+export const deleteCategory=asynchandler(async (req, res) => {
 
     const { id } = req.params
 
@@ -115,8 +111,8 @@ CategoryController.delete('/:id',verifiveToken,authorizeRoles('admin'),asynchand
       }
     })
   })
-)
-CategoryController.put('/:id',verifiveToken,authorizeRoles('admin'),asynchandler(async(req,res)=>{
+
+export const updateCategory=asynchandler(async(req,res)=>{
     const {id}=req.params
     const {name,image}=req.body
     const category =await Category.findById(id)
@@ -143,7 +139,7 @@ CategoryController.put('/:id',verifiveToken,authorizeRoles('admin'),asynchandler
     })
    
 
-}))
+})
 
-export default CategoryController
+
 

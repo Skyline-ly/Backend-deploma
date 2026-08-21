@@ -17,7 +17,3 @@ export const authorizeRoles = (...allowedRoles) => {
     next();
   };
 };
-
-// Usage in your routes:
-// router.get('/admin/users', protect, authorizeRoles('admin'), getAllUsers);
-// router.post('/seller/products', protect, authorizeRoles('admin', 'seller'), createProduct);

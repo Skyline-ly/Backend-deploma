@@ -1,13 +1,14 @@
-import express from 'express'
+
 import { User } from '../model/User.js'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import asynchandler from 'express-async-handler'
 
-const AuthController = express.Router()
 
 
-AuthController.post('/register', asynchandler(async (req, res) => {
+
+
+export const register=asynchandler(async (req, res) => {
     const {
         name,
         email,
@@ -73,11 +74,12 @@ AuthController.post('/register', asynchandler(async (req, res) => {
         }
     });
 
-}));
+});
 
 
 
-AuthController.post('/login', asynchandler(async (req, res) => {
+
+export const login=asynchandler(async (req, res) => {
     const { email, password } = req.body
 
     if (!email || !password) {
@@ -131,6 +133,3 @@ AuthController.post('/login', asynchandler(async (req, res) => {
         }
     })
 })
-)
-
-export default AuthController

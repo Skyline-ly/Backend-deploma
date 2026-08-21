@@ -1,13 +1,10 @@
-import express from 'express'
+
 import asynchandler from 'express-async-handler'
 import { User } from '../model/User.js'
-import { verifiveToken } from '../middlewar/authCatch.js'
-import { authorizeRoles } from '../middlewar/adminCatch.js'
 
 
-const UserController = express.Router()
 
-UserController.get('/pending',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
+export const userPending=asynchandler(async (req, res) => {
 
     const sellers = await User.find({
       sellerStatus: 'pending'
@@ -19,8 +16,9 @@ UserController.get('/pending',verifiveToken,authorizeRoles('admin'),asynchandler
       data: sellers
     });
   })
-);
-UserController.get('/search',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
+;
+
+export const searchUser=asynchandler(async (req, res) => {
 
     const { page = 1, limit = 10, search, sellerStatus, role } = req.query
 
@@ -39,11 +37,12 @@ UserController.get('/search',verifiveToken,authorizeRoles('admin'),asynchandler(
     const user = await User.paginate(query, { page, limit })
     return res.send(user)
 
-  })
+  }
 );
 
 
-UserController.put('/:id/approve', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+// UserController.put('/:id/approve', verifiveToken, authorizeRoles('admin'), 
+ export const approveUser=asynchandler(async (req, res) => {
   const { id } = req.params
 
   const user = await User.findById(id)
@@ -70,10 +69,11 @@ UserController.put('/:id/approve', verifiveToken, authorizeRoles('admin'), async
       sellerStatus: user.sellerStatus
     }
   });
-}));
+});
 
 
-UserController.put('/:id/unsuspend', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+// UserController.put('/:id/unsuspend', verifiveToken, authorizeRoles('admin'), 
+export const unsuspendUser=asynchandler(async (req, res) => {
 
   const { id } = req.params
 
@@ -107,10 +107,12 @@ UserController.put('/:id/unsuspend', verifiveToken, authorizeRoles('admin'), asy
       sellerStatus: user.sellerStatus
     }
   })
-})
-)
+});
 
-UserController.put('/:id/unreject', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+
+// UserController.put('/:id/unreject', verifiveToken, authorizeRoles('admin'), 
+
+export const unrejectUser=asynchandler(async (req, res) => {
 
   const { id } = req.params
 
@@ -145,10 +147,12 @@ UserController.put('/:id/unreject', verifiveToken, authorizeRoles('admin'), asyn
     }
   })
 })
-)
+;
 
 
-UserController.put('/update-profile', verifiveToken, asynchandler(async (req, res) => {
+// UserController.put('/update-profile', verifiveToken, 
+// 
+export const userProfile=asynchandler(async (req, res) => {
 
   const userId = req.user.userId
   const { name, phone } = req.body
@@ -180,9 +184,10 @@ UserController.put('/update-profile', verifiveToken, asynchandler(async (req, re
     }
   })
 
-}))
+});
 
-UserController.put('/:id/reject', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+
+export const rejectUser=asynchandler(async (req, res) => {
   const { id } = req.params
   const user = await User.findById(id)
 
@@ -214,10 +219,10 @@ UserController.put('/:id/reject', verifiveToken, authorizeRoles('admin'), asynch
 
 
 
-}));
+});
 
 
-UserController.put('/:id/suspend',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
+export const suspendUser=asynchandler(async (req, res) => {
 
     const { id } = req.params
     const user = await User.findById(id);
@@ -253,11 +258,5 @@ UserController.put('/:id/suspend',verifiveToken,authorizeRoles('admin'),asynchan
         sellerStatus: user.sellerStatus
       }
     });
-  })
+  }
 );
-
-
-
-
-
-export default UserController

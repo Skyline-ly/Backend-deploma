@@ -2,12 +2,12 @@ import express from "express";
 import mongoose from "mongoose";
 import helmet from 'helmet'
 import dotenv from "dotenv";
+import mongoSanitize from 'express-mongo-sanitize';
 import { dbConnect } from "./src/confic/db.js";
 import { JSCatch } from "./src/middlewar/jsonFormatCatch.js";
 import AuthRouter from "./src/route/authRoute.js";
 import UserRouther from "./src/route/userRoute.js";
-import mongoSanitize from 'express-mongo-sanitize';
-import CategoryRouter from "./src/route/categoryController.js";
+import CategoryRouter from "./src/route/categoryRoute.js";
 
 
 dotenv.config();
@@ -24,9 +24,9 @@ app.use(express.json());
 app.use(mongoSanitize())
 app.use(JSCatch)
 
-app.use('/api',AuthRouter)
-app.use('/api',UserRouther)
-app.use('/api',CategoryRouter)
+app.use("/api/auth",AuthRouter );
+app.use('/api/user',UserRouther)
+app.use('/api/categories',CategoryRouter)
 
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
