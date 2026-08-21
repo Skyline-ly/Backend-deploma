@@ -7,11 +7,7 @@ import { authorizeRoles } from '../middlewar/adminCatch.js'
 
 const UserController = express.Router()
 
-UserController.get(
-  '/pending',
-  verifiveToken,
-  authorizeRoles('admin'),
-  asynchandler(async (req, res) => {
+UserController.get('/pending',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
 
     const sellers = await User.find({
       sellerStatus: 'pending'
@@ -47,7 +43,7 @@ UserController.get('/search',verifiveToken,authorizeRoles('admin'),asynchandler(
 );
 
 
-UserController.put('/sellers/:id/approve', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+UserController.put('/:id/approve', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
   const { id } = req.params
 
   const user = await User.findById(id)
@@ -77,7 +73,7 @@ UserController.put('/sellers/:id/approve', verifiveToken, authorizeRoles('admin'
 }));
 
 
-UserController.put('/sellers/:id/unsuspend', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+UserController.put('/:id/unsuspend', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
 
   const { id } = req.params
 
@@ -114,7 +110,7 @@ UserController.put('/sellers/:id/unsuspend', verifiveToken, authorizeRoles('admi
 })
 )
 
-UserController.put('/sellers/:id/unreject', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+UserController.put('/:id/unreject', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
 
   const { id } = req.params
 
@@ -152,7 +148,7 @@ UserController.put('/sellers/:id/unreject', verifiveToken, authorizeRoles('admin
 )
 
 
-UserController.put('/sellers/update-profile', verifiveToken, asynchandler(async (req, res) => {
+UserController.put('/update-profile', verifiveToken, asynchandler(async (req, res) => {
 
   const userId = req.user.userId
   const { name, phone } = req.body
@@ -186,7 +182,7 @@ UserController.put('/sellers/update-profile', verifiveToken, asynchandler(async 
 
 }))
 
-UserController.put('/sellers/:id/reject', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
+UserController.put('/:id/reject', verifiveToken, authorizeRoles('admin'), asynchandler(async (req, res) => {
   const { id } = req.params
   const user = await User.findById(id)
 
@@ -221,7 +217,7 @@ UserController.put('/sellers/:id/reject', verifiveToken, authorizeRoles('admin')
 }));
 
 
-UserController.put('/sellers/:id/suspend',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
+UserController.put('/:id/suspend',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
 
     const { id } = req.params
     const user = await User.findById(id);

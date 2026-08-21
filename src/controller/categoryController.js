@@ -4,9 +4,30 @@ import { authorizeRoles } from '../middlewar/adminCatch.js'
 import asynchandler from 'express-async-handler'
 import { Category } from '../model/Category.js'
 
-const categoryController=express.Router()
+const CategoryController=express.Router()
 
-categoryController.post('/create-category',verifiveToken,authorizeRoles('admin'),asynchandler(async(req ,res)=>{
+
+CategoryController.get('/search',asynchandler(async(req,res)=>{
+
+    const {page=1,limit=10,search}=req.query
+    
+    const query={
+        isActive:true
+    }
+
+    if(search){
+      query.name = { $regex: search, $options: 'i' }
+    }
+
+    const catetegory=await Category.paginate(query,{page,limit})
+
+    return res.json(catetegory)
+    
+
+
+}))
+
+CategoryController.post('/create',verifiveToken,authorizeRoles('admin'),asynchandler(async(req ,res)=>{
     const {name,image}=req.body
 
     if(!name || !image){
@@ -17,7 +38,7 @@ categoryController.post('/create-category',verifiveToken,authorizeRoles('admin')
 
     const analy=name.trim().toLowerCase();
 
-    const isCategoryNameExit=await Category.find({
+    const isCategoryNameExit=await Category.findOne({
         name:analy
     })
     if (isCategoryNameExit) {
@@ -34,7 +55,7 @@ categoryController.post('/create-category',verifiveToken,authorizeRoles('admin')
         message :"create successfully "
         ,data:{
             categoryId:category._id,
-            name:category.name,
+             name:category.name,
             categoryImage:category.image,
              createdBy: category.createdBy
         }
@@ -43,7 +64,36 @@ categoryController.post('/create-category',verifiveToken,authorizeRoles('admin')
 
 }))
 
-categoryController.delete('categories/:id/delete',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
+CategoryController.get('/:id',asynchandler(async(req,res)=>{
+
+    const {id}=req.params
+
+    const category=await Category.findOne({_id:id,
+        isActive:true
+    })
+    if(!category){
+        return res.json({message:"category underfind"})
+    }
+
+    return res.json(category)
+
+}))
+
+CategoryController.get('/',asynchandler(async(req,res)=>{
+
+
+    const category=await Category.find({
+        isActive:true
+    })
+    if(!category){
+        res.json({message:"category underfind"})
+    }
+
+    return res.json(category)
+
+}))
+
+CategoryController.delete('/:id',verifiveToken,authorizeRoles('admin'),asynchandler(async (req, res) => {
 
     const { id } = req.params
 
@@ -66,7 +116,7 @@ categoryController.delete('categories/:id/delete',verifiveToken,authorizeRoles('
     })
   })
 )
-categoryController.put('/category/:id/update',verifiveToken,authorizeRoles('admin',asynchandler(async(req,res)=>{
+CategoryController.put('/:id',verifiveToken,authorizeRoles('admin'),asynchandler(async(req,res)=>{
     const {id}=req.params
     const {name,image}=req.body
     const category =await Category.findById(id)
@@ -79,7 +129,7 @@ categoryController.put('/category/:id/update',verifiveToken,authorizeRoles('admi
     }
 
     if(name !== undefined){
-        category.name=name.trim()
+        category.name=name.trim().toLowerCase()
     }
     if(image !== undefined){
         category.image=image
@@ -93,7 +143,7 @@ categoryController.put('/category/:id/update',verifiveToken,authorizeRoles('admi
     })
    
 
-})))
+}))
 
-export default categoryController
+export default CategoryController
 

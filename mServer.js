@@ -23,9 +23,7 @@ app.use(helmet());
 app.use(express.json());
 app.use(mongoSanitize())
 app.use(JSCatch)
-app.get("/", (req, res) => {
-  res.send("Server is running");
-});
+
 app.use('/api',AuthRouter)
 app.use('/api',UserRouther)
 app.use('/api',CategoryRouter)

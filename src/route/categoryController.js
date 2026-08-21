@@ -4,6 +4,6 @@ import categoryController from "../controller/categoryController.js"
 
 const CategoryRouter=express.Router()
 
-CategoryRouter.use('/category',categoryController)
+CategoryRouter.use('/categories',categoryController)
 
 export default CategoryRouter

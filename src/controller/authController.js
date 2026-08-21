@@ -106,7 +106,7 @@ AuthController.post('/login', asynchandler(async (req, res) => {
              role: user.role,
              sellerStatus: user.sellerStatus },
         secretKey,
-        { expiresIn: '5m' }
+        { expiresIn: '30m' }
     )
     const tokenRefress=jwt.sign(
         { userId: user._id,
