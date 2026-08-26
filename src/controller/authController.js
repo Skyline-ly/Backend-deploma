@@ -5,9 +5,6 @@ import jwt from 'jsonwebtoken'
 import asynchandler from 'express-async-handler'
 
 
-
-
-
 export const register=asynchandler(async (req, res) => {
     const {
         name,
@@ -60,7 +57,6 @@ export const register=asynchandler(async (req, res) => {
 
     res.status(201).json({
         success: true,
-
         message: sellerRequset
             ? 'Seller registration submitted successfully. Your request is under Admin review.'
             : 'Customer account created successfully.',
@@ -75,8 +71,6 @@ export const register=asynchandler(async (req, res) => {
     });
 
 });
-
-
 
 
 export const login=asynchandler(async (req, res) => {

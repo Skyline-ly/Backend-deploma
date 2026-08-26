@@ -13,7 +13,7 @@ const BrandSchama = new mongoose.Schema({
         publicId: String,
     },
     category:{
-        typeof:mongoose.Schema.Types.ObjectId,
+        type:mongoose.Schema.Types.ObjectId,
         ref:"Category",
         required:true
     },

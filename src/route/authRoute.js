@@ -4,7 +4,7 @@ import { login, register } from '../controller/authController.js'
 
 const AuthRouter=express.Router()
 
-AuthRouter.post('/register',login)
-AuthRouter.post('/login',register)
+AuthRouter.post('/login',login)
+AuthRouter.post('/register',register)
 
 export default AuthRouter

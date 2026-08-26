@@ -2,8 +2,6 @@
 import asynchandler from 'express-async-handler'
 import { User } from '../model/User.js'
 
-
-
 export const userPending=asynchandler(async (req, res) => {
 
     const sellers = await User.find({
@@ -36,12 +34,10 @@ export const searchUser=asynchandler(async (req, res) => {
     }
     const user = await User.paginate(query, { page, limit })
     return res.send(user)
-
+ 
   }
 );
 
-
-// UserController.put('/:id/approve', verifiveToken, authorizeRoles('admin'), 
  export const approveUser=asynchandler(async (req, res) => {
   const { id } = req.params
 
@@ -109,9 +105,6 @@ export const unsuspendUser=asynchandler(async (req, res) => {
   })
 });
 
-
-// UserController.put('/:id/unreject', verifiveToken, authorizeRoles('admin'), 
-
 export const unrejectUser=asynchandler(async (req, res) => {
 
   const { id } = req.params
@@ -149,9 +142,6 @@ export const unrejectUser=asynchandler(async (req, res) => {
 })
 ;
 
-
-// UserController.put('/update-profile', verifiveToken, 
-// 
 export const userProfile=asynchandler(async (req, res) => {
 
   const userId = req.user.userId
@@ -233,7 +223,6 @@ export const suspendUser=asynchandler(async (req, res) => {
         message: 'User not found'
       });
     }
-
     if (
       user.role !== 'seller' ||
       user.sellerStatus !== 'approved'
@@ -243,9 +232,7 @@ export const suspendUser=asynchandler(async (req, res) => {
         message: 'User is not an active seller'
       });
     }
-
     user.sellerStatus = 'suspended';
-
     await user.save();
 
     return res.status(200).json({

@@ -17,6 +17,7 @@ UserRouther.put('/:id/suspend',verifiveToken,authorizeRoles('admin'),suspendUser
 UserRouther.put('/:id/reject',verifiveToken,authorizeRoles('admin'),rejectUser)
 
 UserRouther.put('/:id/unreject',verifiveToken,authorizeRoles('admin'),unrejectUser)
+
 UserRouther.put('/profile',verifiveToken,userProfile)
 
 

@@ -1,12 +1,9 @@
 import express from 'express'
 import asynhandler from 'express-async-handler'
-import { verifiveToken } from '../middlewar/verifyToken.js'
-import { authorizeRoles } from '../middlewar/catchByRole.js'
 import { Brand } from '../model/Brand.js'
 
-const BrandController=express.Router()
 
-BrandController.post('/create',verifiveToken,authorizeRoles('admin'),asynhandler(async(req,res)=>{
+export const createBrand= asynhandler(async(req,res)=>{
     const {name,image,category}=req.body
     if(!name || !image ||!category){
         return res.json({message:'filed requrired'})
@@ -17,9 +14,10 @@ BrandController.post('/create',verifiveToken,authorizeRoles('admin'),asynhandler
     const isExite= await Brand.findOne({name:analy,category})
     
     if(isExite){
-        return res.json({message:"brand alrady have"})
-    }
 
+        return res.json({message:"brand alrady have"})
+
+    }
     const brand=await Brand.create({
         name:analy,
         image,
@@ -37,10 +35,10 @@ BrandController.post('/create',verifiveToken,authorizeRoles('admin'),asynhandler
             category:brand.category
         }
     })
+})
 
-}))
 
-BrandController.put('/:id',verifiveToken,authorizeRoles('admin'),asynhandler(async(req,res)=>{
+export const updateBrand=asynhandler(async(req,res)=>{
 
     const {id}=req.params
     const {image,category,name}=req.body
@@ -66,13 +64,13 @@ BrandController.put('/:id',verifiveToken,authorizeRoles('admin'),asynhandler(asy
         data:brand
     })
 
-}))
+})
+export const getBrand=asynhandler(async(req,res)=>{
+    const brand=await Brand.find()
+    res.json(brand)
+})
 
-BrandController.delete(
-    "/:id",
-    verifiveToken,
-    authorizeRoles("admin"),
-    asynhandler(async (req, res) => {
+export const deleteBrand=asynhandler(async (req, res) => {
 
         const { id } = req.params;
 
@@ -94,7 +92,10 @@ BrandController.delete(
             message: "Brand deactivated successfully",
             data: brand
         });
-    })
-);
+})
+
+
+
+
 
 

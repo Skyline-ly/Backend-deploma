@@ -1,38 +1,26 @@
 import asynchandler from 'express-async-handler'
 import { Category } from '../model/Category.js'
 
-
 export const searchCategoty=asynchandler(async(req,res)=>{
-
     const {page=1,limit=10,search}=req.query
-    
     const query={
         isActive:true
     }
-
     if(search){
       query.name = { $regex: search, $options: 'i' }
     }
-
     const catetegory=await Category.paginate(query,{page,limit})
 
     return res.json(catetegory)
-    
-
-
 })
-
 export const createCategory=asynchandler(async(req ,res)=>{
     const {name,image}=req.body
-
     if(!name || !image){
         return res.json({
             message:"all field are requrire"
         })
     }
-
     const analy=name.trim().toLowerCase();
-
     const isCategoryNameExit=await Category.findOne({
         name:analy
     })
@@ -56,9 +44,7 @@ export const createCategory=asynchandler(async(req ,res)=>{
         }
     })
 
-
 })
-
 
 export const getCategoryId=asynchandler(async(req,res)=>{
 
