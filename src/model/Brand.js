@@ -17,6 +17,11 @@ const BrandSchama = new mongoose.Schema({
         ref:"Category",
         required:true
     },
+    subCategory:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"Subcategory",
+        required:true
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",

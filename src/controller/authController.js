@@ -79,8 +79,9 @@ export const login=asynchandler(async (req, res) => {
     if (!email || !password) {
         return res.status(400).json({ message: 'Email and password are required' })
     }
+    const normalizedEmail=email.trim().toLowerCase()
 
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email :normalizedEmail})
     if (!user) {
         return res.status(401).json({ message: 'Invalid email or password' })
     }
