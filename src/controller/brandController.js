@@ -4,35 +4,41 @@ import { Brand } from '../model/Brand.js'
 
 
 export const createBrand= asynhandler(async(req,res)=>{
-    const {name,image,category}=req.body
-    if(!name || !image ||!category){
-        return res.json({message:'filed requrired'})
-
+    const {name,image,category,subCategory}=req.body
+    if(!name || !image ||!category ||!subCategory){
+        return res.status(400).json({
+            success: false,
+            message:'All fields are required'
+        })
     }
     const analy=name.trim().toLowerCase();
 
-    const isExite= await Brand.findOne({name:analy,category})
+    const isExite= await Brand.findOne({name:analy,category,subCategory})
     
     if(isExite){
-
-        return res.json({message:"brand alrady have"})
-
+        return res.status(409).json({
+            success: false,
+            message:"Brand already exists"
+        })
     }
     const brand=await Brand.create({
         name:analy,
         image,
         category,
+        subCategory,
         createdBy:req.user.userId
     })
 
-    return res.json({
-        message:"create succeffully",
+    return res.status(201).json({
+        success: true,
+        message:"Brand created successfully",
         data:{
             brandId:brand._id,
             brandname:brand.name,
-            brandIm:brand.image,
+            brandImage:brand.image,
+            category:brand.category,
+            subCategory:brand.subCategory,
             createdBy:brand.createdBy,
-            category:brand.category
         }
     })
 })
@@ -41,12 +47,15 @@ export const createBrand= asynhandler(async(req,res)=>{
 export const updateBrand=asynhandler(async(req,res)=>{
 
     const {id}=req.params
-    const {image,category,name}=req.body
+    const {image,category,name,subCategory}=req.body
 
     const brand=await Brand.findById(id)
 
     if(!brand){
-        return res.json({message:'brand not found'})
+        return res.status(404).json({
+            success: false,
+            message:'Brand not found'
+        })
     }
 
     if(name !==undefined){
@@ -55,19 +64,29 @@ export const updateBrand=asynhandler(async(req,res)=>{
     if(category !==undefined){
         brand.category=category
     }
+    if(subCategory !==undefined){
+        brand.subCategory=subCategory
+    }
     if(image !==undefined){
         brand.image=image
     }
     await brand.save()
 
-    return res.json({message:'brand update succeffully',
+    return res.status(200).json({
+        success: true,
+        message:'Brand updated successfully',
         data:brand
     })
 
 })
 export const getBrand=asynhandler(async(req,res)=>{
-    const brand=await Brand.find()
-    res.json(brand)
+    const brand=await Brand.find({isActive:true}).populate("category","name").populate("subCategory","name")
+
+    return res.status(200).json({
+        success: true,
+        count:brand.length,
+        data:brand
+    })
 })
 
 export const deleteBrand=asynhandler(async (req, res) => {

@@ -19,13 +19,15 @@ export const register=asynchandler(async (req, res) => {
         });
     }
     if (role && !['customer', 'seller'].includes(role)) {
-        return res.json({
-            message: "invalide registion role"
+        return res.status(400).json({
+            success: false,
+            message: "Invalid registration role"
         })
     }
     if (typeof email !== "string") {
-        return res.json({
-            message: "invalid email fromat"
+        return res.status(400).json({
+            success: false,
+            message: "Invalid email format"
         })
     }
     const normalizedEmail = email.trim().toLowerCase();
@@ -55,12 +57,11 @@ export const register=asynchandler(async (req, res) => {
         sellerStatus: sellerRequset ? 'pending' : 'none'
     })
 
-    res.status(201).json({
+    return res.status(201).json({
         success: true,
         message: sellerRequset
             ? 'Seller registration submitted successfully. Your request is under Admin review.'
             : 'Customer account created successfully.',
-
         data: {
             id: cretaeUser._id,
             name: cretaeUser.name,
@@ -115,7 +116,8 @@ export const login=asynchandler(async (req, res) => {
 
     )
 
-    res.status(200).json({
+    return res.status(200).json({
+        success: true,
         message: 'Login successful',
         token,
         tokenRefress,

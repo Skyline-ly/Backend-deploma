@@ -33,7 +33,10 @@ export const searchUser=asynchandler(async (req, res) => {
       query.role = role
     }
     const user = await User.paginate(query, { page, limit })
-    return res.send(user)
+    return res.status(200).json({
+        success: true,
+        data: user
+    })
  
   }
 );
@@ -44,18 +47,23 @@ export const searchUser=asynchandler(async (req, res) => {
   const user = await User.findById(id)
 
   if (!user) {
-
-    return res.json('user is not found')
+    return res.status(404).json({
+        success: false,
+        message: 'User not found'
+    })
   }
   if (user.sellerStatus !== 'pending') {
-    return res.json('seller is not pending')
+    return res.status(400).json({
+        success: false,
+        message: 'User seller status is not pending'
+    })
   }
 
   user.role = 'seller'
   user.sellerStatus = 'approved'
 
   await user.save()
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Seller approved successfully",
     data: {

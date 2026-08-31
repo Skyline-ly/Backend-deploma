@@ -16,8 +16,9 @@ export const searchCategoty=asynchandler(async(req,res)=>{
 export const createCategory=asynchandler(async(req ,res)=>{
     const {name,image}=req.body
     if(!name || !image){
-        return res.json({
-            message:"all field are requrire"
+        return res.status(400).json({
+            success: false,
+            message:"All fields are required"
         })
     }
     const analy=name.trim().toLowerCase();
@@ -25,22 +26,23 @@ export const createCategory=asynchandler(async(req ,res)=>{
         name:analy
     })
     if (isCategoryNameExit) {
-        return res.status(400).json({
+        return res.status(409).json({
             success: false,
-            message: 'gategory alrady exite.'
+            message: 'Category already exists'
         });
     }
     const category=await Category.create({
         name:analy,image,
         createdBy:req.user.userId
     })
-    res.json({
-        message :"create successfully "
-        ,data:{
+    return res.status(201).json({
+        success: true,
+        message:"Category created successfully",
+        data:{
             categoryId:category._id,
-             name:category.name,
+            name:category.name,
             categoryImage:category.image,
-             createdBy: category.createdBy
+            createdBy: category.createdBy
         }
     })
 
@@ -54,24 +56,36 @@ export const getCategoryId=asynchandler(async(req,res)=>{
         isActive:true
     })
     if(!category){
-        return res.json({message:"category underfind"})
+        return res.status(404).json({
+            success: false,
+            message:"Category not found"
+        })
     }
 
-    return res.json(category)
+    return res.status(200).json({
+        success: true,
+        data: category
+    })
 
 })
 
 export const getAllcategory=asynchandler(async(req,res)=>{
 
-
     const category=await Category.find({
         isActive:true
     })
-    if(!category){
-        res.json({message:"category underfind"})
+    if(!category || category.length === 0){
+        return res.status(404).json({
+            success: false,
+            message:"No categories found"
+        })
     }
 
-    return res.json(category)
+    return res.status(200).json({
+        success: true,
+        count: category.length,
+        data: category
+    })
 
 })
 
@@ -117,11 +131,10 @@ export const updateCategory=asynchandler(async(req,res)=>{
         category.image=image
     }
     await category.save()
-    res.json({
-        message:"category update succeffully",
+    return res.status(200).json({
+        success: true,
+        message:"Category updated successfully",
         data:category
-
-        
     })
    
 
