@@ -1,6 +1,8 @@
 import express from "express";
 import helmet from 'helmet'
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
+import cors from 'cors'
 import mongoSanitize from 'express-mongo-sanitize';
 import { dbConnect } from "./src/confic/db.js";
 import { JSCatch } from "./src/middlewar/jsonFormatCatch.js";
@@ -16,8 +18,8 @@ await dbConnect()
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
 app.use(helmet());
+app.use(cookieParser());
 
 
 app.use(express.json());

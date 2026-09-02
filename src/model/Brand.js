@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import mongoosePaginate from 'mongoose-paginate-v2'
 
 const BrandSchama = new mongoose.Schema({
     name: {
@@ -37,5 +38,18 @@ const BrandSchama = new mongoose.Schema({
     {
         timestamps: true,
     }
-)
+);
+BrandSchama.index(
+    {
+        name: 1,
+        category: 1,
+        subCategory: 1,
+    },
+    {
+        unique: true,
+    }
+);
+
+
+BrandSchama.plugin(mongoosePaginate)
 export const Brand=mongoose.model("Brand",BrandSchama)

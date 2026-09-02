@@ -5,6 +5,7 @@ import { User } from '../model/User.js'
 export const userPending=asynchandler(async (req, res) => {
 
     const sellers = await User.find({
+      role:'customer',
       sellerStatus: 'pending'
     }).select('-password');
 
@@ -32,7 +33,7 @@ export const searchUser=asynchandler(async (req, res) => {
     if (role) {
       query.role = role
     }
-    const user = await User.paginate(query, { page, limit })
+    const user = await User.paginate(query, { page, limit,select: '-password' })
     return res.status(200).json({
         success: true,
         data: user
@@ -76,7 +77,6 @@ export const searchUser=asynchandler(async (req, res) => {
 });
 
 
-// UserController.put('/:id/unsuspend', verifiveToken, authorizeRoles('admin'), 
 export const unsuspendUser=asynchandler(async (req, res) => {
 
   const { id } = req.params
@@ -161,12 +161,13 @@ export const userProfile=asynchandler(async (req, res) => {
     return res.json({ message: 'user not found' })
   }
 
-  if (name) {
-    user.name = name.trim()
-  }
-  if (phone) {
-    user.phone = phone.trim()
-  }
+  if (name !== undefined) {
+  user.name = name.trim();
+}
+
+if (phone !== undefined) {
+  user.phone = phone.trim();
+}
   await user.save()
 
   return res.json({

@@ -80,7 +80,22 @@ export const updateBrand=asynhandler(async(req,res)=>{
 
 })
 export const getBrand=asynhandler(async(req,res)=>{
-    const brand=await Brand.find({isActive:true}).populate("category","name").populate("subCategory","name")
+    const {page=1,limit=10,category,subCategory,search}=req.query
+
+    const query={isActive:true}
+
+    if(search){
+        query.name={$regex:search,$options:'i'}
+    }
+    if(category){
+        query.category=category
+    }
+    if(subCategory){
+        query.subCategory=subCategory
+    }
+    const brand=await Brand.find(query,{page,limit})
+    .populate("category","name")
+    .populate("subCategory","name")
 
     return res.status(200).json({
         success: true,

@@ -2,6 +2,24 @@ import asynchandler from 'express-async-handler'
 import { Subcategory } from '../model/Subcategory'
 
 
+export const getSubcategory=asynchandler(async(req,res)=>{
+    const{page=10,limit=1,search,category}=req.query
+
+    const query={isActive:true}
+
+    if(search.trim()){
+        query.search={$regex:search,$options:'i'}
+    }
+    if(category){
+        query.category=category
+    }
+    const subCategory=await Subcategory.find(query,{page,limit}).populate('category',name)
+
+    return res.status(200).json({
+        success:true,
+        subCategory
+    })
+})
 export const createSubcategory=asynchandler(async(req,res)=>{
     const {name,image,category}=req.body
     if(!name || !image ||!category){
