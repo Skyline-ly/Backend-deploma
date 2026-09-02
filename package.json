@@ -2,9 +2,9 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "mServer.js",
+  "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/mServer.js"
+    "dev": "nodemon src/index.js"
   },
   "keywords": [],
   "author": "",
