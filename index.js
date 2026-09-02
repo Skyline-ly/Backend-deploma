@@ -79,7 +79,7 @@ app.use('/api/brand', BrandRouter);
 app.use('/api/product', ProductRputer);
 
 // Default Route for status check
-app.get('/', (req, res) => {
+app.get('/m', (req, res) => {
   res.json({ message: "API is running successfully on Vercel!" });
 });
 
