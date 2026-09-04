@@ -1,18 +1,7 @@
 import asynchandler from 'express-async-handler'
 import { Category } from '../model/Category.js'
 
-export const searchCategoty=asynchandler(async(req,res)=>{
-    const {page=1,limit=10,search}=req.query
-    const query={
-        isActive:true
-    }
-    if(search){
-      query.name = { $regex: search, $options: 'i' }
-    }
-    const catetegory=await Category.paginate(query,{page,limit})
 
-    return res.json(catetegory)
-})
 export const createCategory=asynchandler(async(req ,res)=>{
     const {name,image}=req.body
     if(!name || !image){
@@ -71,15 +60,14 @@ export const getCategoryId=asynchandler(async(req,res)=>{
 
 export const getAllcategory=asynchandler(async(req,res)=>{
 
-    const category=await Category.find({
-        isActive:true
-    })
-    if(!category || category.length === 0){
-        return res.status(404).json({
-            success: false,
-            message:"No categories found"
-        })
+   const {page=1,limit=10,search}=req.query
+
+    const query={isActive:true}
+
+    if(search){
+        query.name={$regex:search,$options:'i'}
     }
+    const category=await Category.paginate(query,{page,limit})
 
     return res.status(200).json({
         success: true,
@@ -93,7 +81,7 @@ export const deleteCategory=asynchandler(async (req, res) => {
 
     const { id } = req.params
 
-    const category = await Category.findByIdAndDelete(id)
+    const category = await Category.findById(id)
 
     if (!category) {
       return res.status(404).json({
@@ -101,6 +89,8 @@ export const deleteCategory=asynchandler(async (req, res) => {
         message: 'Category not found'
       })
     }
+    category.isActive = false
+    await category.save()
 
     return res.status(200).json({
       success: true,
@@ -112,33 +102,49 @@ export const deleteCategory=asynchandler(async (req, res) => {
     })
   })
 
-export const updateCategory=asynchandler(async(req,res)=>{
-    const {id}=req.params
-    const {name,image}=req.body
-    const category =await Category.findById(id)
+export const updateCategory = asynchandler(async (req, res) => {
+    const { id } = req.params;
+    const { name, image } = req.body;
+
+    const category = await Category.findById(id);
 
     if (!category) {
-      return res.status(404).json({
-        success: false,
-        message: 'Category not found'
-      })
+        return res.status(404).json({
+            success: false,
+            message: "Category not found"
+        });
     }
 
-    if(name !== undefined){
-        category.name=name.trim().toLowerCase()
+    if (name !== undefined) {
+        const normalizedName = name.trim().toLowerCase();
+
+        const exists = await Category.findOne({
+            name: normalizedName,
+            _id: { $ne: id }
+        });
+
+        if (exists) {
+            return res.status(409).json({
+                success: false,
+                message: "Category name already exists"
+            });
+        }
+
+        category.name = normalizedName;
     }
-    if(image !== undefined){
-        category.image=image
+
+    if (image !== undefined) {
+        category.image = image;
     }
-    await category.save()
+
+    await category.save();
+
     return res.status(200).json({
         success: true,
-        message:"Category updated successfully",
-        data:category
-    })
-   
-
-})
+        message: "Category updated successfully",
+        data: category
+    });
+});
 
 
 

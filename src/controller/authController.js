@@ -137,61 +137,7 @@ export const login=asynchandler(async (req, res) => {
     })
 })
 
-// export const refreshToken=asynchandler(async(req,res)=>{
-//     const refreshToken=req.cookies.refreshToken
 
-//     if(!refreshToken){
-//         return res.status(401).json({
-//             success: false,
-//             message: 'Refresh token required'
-//         })
-//     }  
-//     const decode=jwt.verify(
-//         refreshToken,process.env.REFRESH_TOKEN_SECRET
-//     )    
-//     const user= await User.findById(decode.userId)
-
-//     if(!user){
-//         return res.status(401).json({
-//             success:false,
-//             message:'User not found'
-//         })
-//     }
-//     if(!user.isActive){
-//         return res.status(403).json({
-//             success:false,
-//             message:'Account is invalid'
-//         })
-//     }
-//     const isRefreshTokenExits=await bcrypt.compare(refreshToken,user.refreshToken)
-
-//     if(!isRefreshTokenExits){
-//         return res.status(401).json({
-//             success:false,
-//             message:'Refresh Token is invalid'
-//         })
-//     }
-//     const accessToken=jwt.sign(
-//         {
-//             userId:user._id,
-//             role:user.role
-//         },
-//         process.env.JWT_SECRET,
-//         {
-//             expiresIn:'30m'
-
-//         }
-
-//     )
-//     return res.status(200).json({
-//         success:true,
-//         accessToken
-//     })
-        
-           
-  
-
-// })
 export const refreshToken = asynchandler(async (req, res) => {
     const refreshToken = req.cookies.refreshToken;
 

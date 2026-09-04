@@ -1,5 +1,5 @@
 import asynchandler from 'express-async-handler'
-import { Subcategory } from '../model/Subcategory'
+import { Subcategory } from '../model/Subcategory.js'
 
 
 export const getSubcategory=asynchandler(async(req,res)=>{

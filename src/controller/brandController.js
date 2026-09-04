@@ -103,6 +103,22 @@ export const getBrand=asynhandler(async(req,res)=>{
         data:brand
     })
 })
+export const getBrandById=asynhandler(async(req,res)=>{
+    const {id}=req.params
+    
+    const brand=await Brand.findById(id)
+
+    if(!brand){
+        return res.status(404).json({
+            success:false,
+            message:'brand not found'
+        })
+    }
+    return res.status(201).json({
+        success:true,
+        data:brand
+    })
+})
 
 export const deleteBrand=asynhandler(async (req, res) => {
 

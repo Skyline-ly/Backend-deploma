@@ -2,7 +2,7 @@ import express from "express";
 import helmet from 'helmet'
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
-import cors from 'cors'
+
 import mongoSanitize from 'express-mongo-sanitize';
 import { dbConnect } from "./src/confic/db.js";
 import { JSCatch } from "./src/middlewar/jsonFormatCatch.js";
@@ -11,6 +11,7 @@ import UserRouther from "./src/route/userRoute.js";
 import CategoryRouter from "./src/route/categoryRoute.js";
 import BrandRouter from "./src/route/brandRoute.js";
 import ProductRputer from "./src/route/productRoute.js";
+import SubCategoryRouter from "./src/route/subCategoryRoute.js";
 
 
 dotenv.config();
@@ -30,6 +31,7 @@ app.use(JSCatch)
 app.use("/api/auth",AuthRouter );
 app.use('/api/user',UserRouther)
 app.use('/api/categories',CategoryRouter)
+app.use('/api/subcategory',SubCategoryRouter)
 app.use('/api/brand',BrandRouter)
 app.use('/api/product',ProductRputer)
 
