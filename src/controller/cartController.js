@@ -99,15 +99,70 @@ await cart.save();
 });
 
 export const deleteCartItem = asyncHandler(async (req, res) => {
-  const { itemId } = req.params;
+  const { id } = req.params;
+
   const userId = req.user.userId;
 
-  if (!userId) {
-    return res.status(401).json({
+  const cart = await Cart.findOne({ customer: userId });
+
+  if (!cart) {
+    return res.status(404).json({
       success: false,
-      message: "Unauthorized",
+      message: "Cart not found",
     });
   }
+  console.log('=======find bug====')
+
+  const item =cart.items.id(id);
+  console.log('=======find bug====',item)
+
+  if (!item) {
+    return res.status(404).json({
+      success: false,
+      message: "Item not found in cart",
+    });
+  }
+  console.log('=======find bug====')
+
+  item.deleteOne();
+
+  await cart.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Item removed from cart",
+    data: cart,
+  });
+});
+export const getCartItems = asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+
+  const cart = await Cart.findOne({ customer: userId })
+
+  if (!cart) {
+    return res.status(404).json({
+      success: false,
+      message: "Cart not found",
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: cart,
+  });
+});
+export const updateCartItem = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { quantity } = req.body;
+
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    return res.status(400).json({
+      success: false,
+      message: "Quantity must be at least 1",
+    });
+  }
+
+  const userId = req.user.userId;
 
   const cart = await Cart.findOne({ customer: userId });
 
@@ -118,23 +173,47 @@ export const deleteCartItem = asyncHandler(async (req, res) => {
     });
   }
 
-  const itemIndex = cart.items.findIndex(
-    (item) => item._id.toString() === itemId
-  );
+  const item = cart.items.id(id);
 
-  if (itemIndex === -1) {
+  if (!item) {
     return res.status(404).json({
       success: false,
       message: "Item not found in cart",
     });
   }
 
-  cart.items.splice(itemIndex, 1);
+  const product = await Product.findById(item.product);
+
+  if (!product) {
+    return res.status(404).json({
+      success: false,
+      message: "Product not found",
+    });
+  }
+
+  const variant = product.variants.id(item.variantId);
+
+  if (!variant) {
+    return res.status(404).json({
+      success: false,
+      message: "Variant is not related to this product",
+    });
+  }
+
+  if (variant.stock < quantity) {
+    return res.status(400).json({
+      success: false,
+      message: `Only ${variant.stock} items available`,
+    });
+  }
+
+  item.quantity = quantity;
+
   await cart.save();
 
   return res.status(200).json({
     success: true,
-    message: "Item removed from cart",
-    cart,
+    message: "Cart item updated successfully",
+    data: cart,
   });
 });

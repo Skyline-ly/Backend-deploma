@@ -71,7 +71,6 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
 
-  
     seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -87,6 +86,13 @@ const productSchema = new mongoose.Schema(
 
     discountPrice: {
       type: Number,
+      min: 0,
+    },
+
+    // Used when product has no variants
+    stock: {
+      type: Number,
+      default: 0,
       min: 0,
     },
 

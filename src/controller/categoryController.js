@@ -2,40 +2,54 @@ import asynchandler from 'express-async-handler'
 import { Category } from '../model/Category.js'
 
 
-export const createCategory=asynchandler(async(req ,res)=>{
-    const {name,image}=req.body
-    if(!name || !image){
+export const createCategory = asynchandler(async (req, res) => {
+
+    const { name } = req.body;
+
+    if (!name) {
         return res.status(400).json({
             success: false,
-            message:"All fields are required"
-        })
-    }
-    const analy=name.trim().toLowerCase();
-    const isCategoryNameExit=await Category.findOne({
-        name:analy
-    })
-    if (isCategoryNameExit) {
-        return res.status(409).json({
-            success: false,
-            message: 'Category already exists'
+            message: "Category name is required"
         });
     }
-    const category=await Category.create({
-        name:analy,image,
-        createdBy:req.user.userId
-    })
+
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            message: "Category image is required"
+        });
+    }
+
+    const analy = name.trim().toLowerCase();
+
+    const isCategoryNameExist = await Category.findOne({
+        name: analy
+    });
+
+    if (isCategoryNameExist) {
+        return res.status(409).json({
+            success: false,
+            message: "Category already exists"
+        });
+    }
+
+    const category = await Category.create({
+        name: analy,
+        image: req.file.path,
+        createdBy: req.user.userId
+    });
+
     return res.status(201).json({
         success: true,
-        message:"Category created successfully",
-        data:{
-            categoryId:category._id,
-            name:category.name,
-            categoryImage:category.image,
+        message: "Category created successfully",
+        data: {
+            categoryId: category._id,
+            name: category.name,
+            categoryImage: category.image,
             createdBy: category.createdBy
         }
-    })
-
-})
+    });
+});
 
 export const getCategoryId=asynchandler(async(req,res)=>{
 
