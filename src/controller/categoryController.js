@@ -5,6 +5,7 @@ import { Category } from '../model/Category.js'
 export const createCategory = asynchandler(async (req, res) => {
 
     const { name } = req.body;
+    const {image}=req.file;
 
     if (!name) {
         return res.status(400).json({
@@ -13,7 +14,7 @@ export const createCategory = asynchandler(async (req, res) => {
         });
     }
 
-    if (!req.file) {
+    if (!image) {
         return res.status(400).json({
             success: false,
             message: "Category image is required"
