@@ -14,6 +14,8 @@ import BrandRouter from "./src/route/brandRoute.js";
 import ProductRputer from "./src/route/productRoute.js";
 import SubCategoryRouter from "./src/route/subCategoryRoute.js";
 import CartRouter from "./src/route/cartRoute.js";
+import orderRoute from "./src/route/orderRoute.js";
+
 
 
 dotenv.config();
@@ -38,6 +40,7 @@ app.use('/api/subcategory',SubCategoryRouter)
 app.use('/api/brand',BrandRouter)
 app.use('/api/product',ProductRputer)
 app.use('/api/cart',CartRouter)
+app.use('/api/order',orderRoute)
 
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
