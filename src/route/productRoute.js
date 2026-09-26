@@ -1,16 +1,43 @@
-import express from 'express'
-import { verifiveToken } from '../middlewar/verifyToken.js'
-import { authorizeRoles } from '../middlewar/catchByRole.js'
+import express from "express";
 
-import { createProduct, deleteProduct, getAllproducts, updateProduct } from '../controller/productController.js'
+import {
+  createProduct,
+  getAllProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+} from "../controller/productController.js";
+import { verifiveToken } from "../middlewar/verifyToken.js";
+import { authorizeRoles } from "../middlewar/catchByRole.js";
 
-const ProductRouter=express.Router()
 
 
+const ProductRouter = express.Router();
 
-ProductRouter.get('/',getAllproducts)
-ProductRouter.post('/create',verifiveToken,authorizeRoles('seller'),createProduct)
-ProductRouter.put('/:id/update',verifiveToken,authorizeRoles('seller'),updateProduct)
-ProductRouter.delete('/:id/delete',verifiveToken,authorizeRoles('seller'),deleteProduct)
 
-export default ProductRouter
+ProductRouter.get("/", getAllProducts);
+ProductRouter.get("/:id", getProductById);
+
+
+ProductRouter.post(
+  "/",
+  verifiveToken,
+  authorizeRoles("seller"),
+  createProduct
+);
+
+ProductRouter.put(
+  "/:id",
+  verifiveToken,
+  authorizeRoles("seller"),
+  updateProduct
+);
+
+ProductRouter.delete(
+  "/:id",
+  verifiveToken,
+  authorizeRoles("seller"),
+  deleteProduct
+);
+
+export default ProductRouter;
