@@ -15,6 +15,8 @@ import ProductRputer from "./src/route/productRoute.js";
 import SubCategoryRouter from "./src/route/subCategoryRoute.js";
 import CartRouter from "./src/route/cartRoute.js";
 import orderRoute from "./src/route/orderRoute.js";
+import ConversationRouter from "./src/route/conversationRoutes.js";
+import MessageRouter from "./src/route/messageRoutes.js";
 
 
 
@@ -41,6 +43,8 @@ app.use('/api/brand',BrandRouter)
 app.use('/api/product',ProductRputer)
 app.use('/api/cart',CartRouter)
 app.use('/api/order',orderRoute)
+app.use('/api/conversation',ConversationRouter)
+app.use('/api/message',MessageRouter)
 
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);

@@ -7,6 +7,6 @@ const BrandRouter=express.Router()
 BrandRouter.get('/',getBrand)
 BrandRouter.get('/:id',getBrandById)
 BrandRouter.post('/create',verifiveToken,authorizeRoles('admin'),createBrand)
-BrandRouter.post('/:id/update',verifiveToken,authorizeRoles('admin'),updateBrand)
-BrandRouter.post('/:id/delete',verifiveToken,authorizeRoles('admin'),deleteBrand)
+BrandRouter.put('/:id/update',verifiveToken,authorizeRoles('admin'),updateBrand)
+BrandRouter.delete('/:id/delete',verifiveToken,authorizeRoles('admin'),deleteBrand)
 export default BrandRouter

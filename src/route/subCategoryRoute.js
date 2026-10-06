@@ -7,7 +7,7 @@ const SubCategoryRouter=express.Router()
 
 SubCategoryRouter.get('/',getSubcategory)
 SubCategoryRouter.post('/create',verifiveToken,authorizeRoles('admin'),createSubcategory)
-SubCategoryRouter.put('/:id/update',verifiveToken,authorizeRoles('admin',updateSubcategoy))
+SubCategoryRouter.put('/:id/update',verifiveToken,authorizeRoles('admin'),updateSubcategoy)
 SubCategoryRouter.delete('/:id/delete',verifiveToken,authorizeRoles('admin'),deleteSubcategory)
 
 export default SubCategoryRouter

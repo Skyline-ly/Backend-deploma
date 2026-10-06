@@ -12,14 +12,6 @@ CategoryRouter.get('/',getAllcategory)
 CategoryRouter.get('/:id',getCategoryId)
 
  CategoryRouter.post('/create',verifiveToken,authorizeRoles('admin'),upload.single('image')
- //(req, res, next) => {
-//         console.log("========== UPLOAD DEBUG ==========");
-//         console.log("BODY:", req.body);
-//         console.log("FILE:", req.file);
-//         console.log("==================================");
-
-//         next();
-//     }
 ,createCategory)
 
 CategoryRouter.put('/:id/update',verifiveToken,authorizeRoles('admin'),updateCategory)

@@ -1,4 +1,4 @@
-import express from 'express'
+
 import asynhandler from 'express-async-handler'
 import { Brand } from '../model/Brand.js'
 
