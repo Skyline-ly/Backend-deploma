@@ -5,7 +5,7 @@ import {
   getMessages,
   markMessagesAsRead,
 } from "../controller/messageController.js";
-import { verifiveToken } from "../middlewar/verifyToken.js";
+import { verifiveToken } from "../middleware/verifyToken.js";
 
 const MessageRouter = express.Router();
 

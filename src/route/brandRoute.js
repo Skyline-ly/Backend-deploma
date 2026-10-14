@@ -1,6 +1,6 @@
 import express from 'express'
-import { verifiveToken } from '../middlewar/verifyToken.js'
-import { authorizeRoles } from '../middlewar/catchByRole.js'
+import { verifiveToken } from '../middleware/verifyToken.js'
+import { authorizeRoles } from '../middleware/catchByRole.js'
 import { createBrand, deleteBrand, getBrand, getBrandById, updateBrand } from '../controller/brandController.js'
 const BrandRouter=express.Router()
 

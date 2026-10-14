@@ -1,7 +1,7 @@
 import express from 'express'
 import { approveUser, rejectUser, searchUser, suspendUser, unrejectUser, userPending, userProfile } from '../controller/userController.js'
-import { verifiveToken } from '../middlewar/verifyToken.js'
-import { authorizeRoles } from '../middlewar/catchByRole.js'
+import { verifiveToken } from '../middleware/verifyToken.js'
+import { authorizeRoles } from '../middleware/catchByRole.js'
 
 
 const UserRouther=express.Router()

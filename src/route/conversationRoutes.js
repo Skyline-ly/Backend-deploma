@@ -5,7 +5,7 @@ import {
   getMyConversations,
   getConversationById,
 } from "../controller/conversationController.js";
-import { verifiveToken } from "../middlewar/verifyToken.js";
+import { verifiveToken } from "../middleware/verifyToken.js";
 
 const ConversationRouter = express.Router();
 

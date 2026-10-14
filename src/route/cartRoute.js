@@ -1,6 +1,6 @@
 import exppress from "express";
-import { verifiveToken } from "../middlewar/verifyToken.js";
-import { authorizeRoles } from "../middlewar/catchByRole.js";
+import { verifiveToken } from "../middleware/verifyToken.js";
+import { authorizeRoles } from "../middleware/catchByRole.js";
 import { addCartItem, deleteCartItem, getCartItems ,updateCartItem } from "../controller/cartController.js";
 const CartRouter=exppress.Router()
 

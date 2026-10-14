@@ -1,8 +1,8 @@
 import express from "express"
-import { verifiveToken } from "../middlewar/verifyToken.js"
+import { verifiveToken } from "../middleware/verifyToken.js"
 import { createCategory, deleteCategory, getAllcategory, getCategoryId, updateCategory } from "../controller/categoryController.js"
-import { authorizeRoles } from "../middlewar/catchByRole.js"
-import upload from "../middlewar/multer.js"
+import { authorizeRoles } from "../middleware/catchByRole.js"
+import upload from "../middleware/multer.js"
 
 
 

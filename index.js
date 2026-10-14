@@ -5,8 +5,8 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 
 import mongoSanitize from 'express-mongo-sanitize';
-import { dbConnect } from "./src/confic/db.js";
-import { JSCatch } from "./src/middlewar/jsonFormatCatch.js";
+import { dbConnect } from "./src/config/db.js";
+import { JSCatch } from "./src/middleware/jsonFormatCatch.js";
 import AuthRouter from "./src/route/authRoute.js";
 import UserRouther from "./src/route/userRoute.js";
 import CategoryRouter from "./src/route/categoryRoute.js";
@@ -17,6 +17,7 @@ import CartRouter from "./src/route/cartRoute.js";
 import orderRoute from "./src/route/orderRoute.js";
 import ConversationRouter from "./src/route/conversationRoutes.js";
 import MessageRouter from "./src/route/messageRoutes.js";
+import AttributeRouter from "./src/route/attributeRoute.js";
 
 
 
@@ -45,6 +46,7 @@ app.use('/api/cart',CartRouter)
 app.use('/api/order',orderRoute)
 app.use('/api/conversation',ConversationRouter)
 app.use('/api/message',MessageRouter)
+app.use('/api/attribute',AttributeRouter)
 
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
