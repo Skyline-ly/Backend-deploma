@@ -19,6 +19,7 @@ UserRouther.put('/:id/reject',verifiveToken,authorizeRoles('admin'),rejectUser)
 UserRouther.put('/:id/unreject',verifiveToken,authorizeRoles('admin'),unrejectUser)
 
 UserRouther.put('/profile',verifiveToken,userProfile)
+UserRouther.post('/become-seller',verifiveToken,authorizeRoles('customer'),becomeSeller)
 
 
 

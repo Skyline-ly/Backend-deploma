@@ -6,33 +6,25 @@ import jwt from 'jsonwebtoken'
 import asynchandler from 'express-async-handler'
 
 
-export const register=asynchandler(async (req, res) => {
-    const {
-        name,
-        email,
-        password,
-        role
-    } = req.body;
+
+export const register = asynchandler(async (req, res) => {
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
         return res.status(400).json({
+            success: false,
             message: 'All fields are required'
         });
     }
-    if (role && !['customer', 'seller'].includes(role)) {
-        return res.status(400).json({
-            success: false,
-            message: "Invalid registration role"
-        })
-    }
-    if (typeof email !== "string") {
-        return res.status(400).json({
-            success: false,
-            message: "Invalid email format"
-        })
-    }
-    const normalizedEmail = email.trim().toLowerCase();
 
+    if (typeof email !== 'string') {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
 
     const userExists = await User.findOne({
         email: normalizedEmail
@@ -45,33 +37,27 @@ export const register=asynchandler(async (req, res) => {
         });
     }
 
-    const hashPassword = await bcrypt.hash(password, 10)
+    const hashPassword = await bcrypt.hash(password, 10);
 
-    const sellerRequset = role === 'seller'
-
-    const cretaeUser = await User.create({
-        name: name,
+    const createdUser = await User.create({
+        name,
         email: normalizedEmail,
         password: hashPassword,
         role: 'customer',
-
-        sellerStatus: sellerRequset ? 'pending' : 'none'
-    })
+        sellerStatus: 'none'
+    });
 
     return res.status(201).json({
         success: true,
-        message: sellerRequset
-            ? 'Seller registration submitted successfully. Your request is under Admin review.'
-            : 'Customer account created successfully.',
+        message: 'Customer account created successfully.',
         data: {
-            id: cretaeUser._id,
-            name: cretaeUser.name,
-            email: cretaeUser.email,
-            role: cretaeUser.role,
-            sellerStatus: cretaeUser.sellerStatus
+            id: createdUser._id,
+            name: createdUser.name,
+            email: createdUser.email,
+            role: createdUser.role,
+            sellerStatus: createdUser.sellerStatus
         }
     });
-
 });
 
 
