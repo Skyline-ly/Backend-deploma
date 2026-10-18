@@ -1,5 +1,5 @@
 import express from 'express'
-import { approveUser, rejectUser, searchUser, suspendUser, unrejectUser, userPending, userProfile } from '../controller/userController.js'
+import { approveUser, rejectUser, searchUser, suspendUser, unrejectUser, userPending, userProfile,becomeSeller } from '../controller/userController.js'
 import { verifiveToken } from '../middleware/verifyToken.js'
 import { authorizeRoles } from '../middleware/catchByRole.js'
 
