@@ -1,27 +1,87 @@
-import express from 'express'
-import { approveUser, rejectUser, searchUser, suspendUser, unrejectUser, userPending, userProfile,becomeSeller } from '../controller/userController.js'
-import { verifiveToken } from '../middleware/verifyToken.js'
-import { authorizeRoles } from '../middleware/catchByRole.js'
+
+import express from "express";
+
+import {
+  approveUser,
+  rejectUser,
+  searchUser,
+  suspendUser,
+  unrejectUser,
+  userPending,
+  getMyProfile,
+  userProfile,
+  becomeSeller,
+} from "../controller/userController.js";
+
+import { verifiveToken } from "../middleware/verifyToken.js";
+import { authorizeRoles } from "../middleware/catchByRole.js";
+
+const UserRouter = express.Router();
 
 
-const UserRouther=express.Router()
+UserRouter.get(
+  "/search",
+  verifiveToken,
+  authorizeRoles("admin"),
+  searchUser
+);
 
-UserRouther.get('/search',verifiveToken,authorizeRoles('admin'),searchUser)
+UserRouter.get(
+  "/pending",
+  verifiveToken,
+  authorizeRoles("admin"),
+  userPending
+);
 
-UserRouther.get('/pending',verifiveToken,authorizeRoles('admin'),userPending)
+UserRouter.put(
+  "/:id/approve",
+  verifiveToken,
+  authorizeRoles("admin"),
+  approveUser
+);
 
-UserRouther.put('/:id/aprove',verifiveToken,authorizeRoles('admin'),approveUser)
+UserRouter.put(
+  "/:id/suspend",
+  verifiveToken,
+  authorizeRoles("admin"),
+  suspendUser
+);
 
-UserRouther.put('/:id/suspend',verifiveToken,authorizeRoles('admin'),suspendUser)
+UserRouter.put(
+  "/:id/reject",
+  verifiveToken,
+  authorizeRoles("admin"),
+  rejectUser
+);
 
-UserRouther.put('/:id/reject',verifiveToken,authorizeRoles('admin'),rejectUser)
-
-UserRouther.put('/:id/unreject',verifiveToken,authorizeRoles('admin'),unrejectUser)
-
-UserRouther.put('/profile',verifiveToken,userProfile)
-UserRouther.post('/become-seller',verifiveToken,authorizeRoles('customer'),becomeSeller)
-
-
+UserRouter.put(
+  "/:id/unreject",
+  verifiveToken,
+  authorizeRoles("admin"),
+  unrejectUser
+);
 
 
-export default UserRouther
+UserRouter.get(
+  "/profile",
+  verifiveToken,
+  authorizeRoles("customer", "seller", "admin"),
+  getMyProfile
+);
+
+UserRouter.patch(
+  "/profile",
+  verifiveToken,
+  authorizeRoles("customer", "seller", "admin"),
+  userProfile
+);
+
+
+UserRouter.post(
+  "/become-seller",
+  verifiveToken,
+  authorizeRoles("customer"),
+  becomeSeller
+);
+
+export default UserRouter;

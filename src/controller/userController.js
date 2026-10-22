@@ -149,29 +149,63 @@ export const unrejectUser = asynchandler(async (req, res) => {
   })
 })
   ;
-
-export const userProfile = asynchandler(async (req, res) => {
-
-  const userId = req.user.userId
-  const { name, phone } = req.body
-
-  const user = await User.findById(userId)
+  export const getMyProfile = asynchandler(async (req, res) => {
+  const user = await User.findById(req.user.userId).select(
+    "name email phone role sellerStatus avatar createdAt"
+  );
 
   if (!user) {
-    return res.json({ message: 'user not found' })
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
   }
 
+  return res.status(200).json({
+    success: true,
+    data: user,
+  });
+});
+
+export const userProfile = asynchandler(async (req, res) => {
+  const user = await User.findById(req.user.userId);
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+  const { name, phone } = req.body;
+
   if (name !== undefined) {
+    if (typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Name cannot be empty",
+      });
+    }
+
     user.name = name.trim();
   }
 
   if (phone !== undefined) {
+    if (typeof phone !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Phone must be a string",
+      });
+    }
+
     user.phone = phone.trim();
   }
-  await user.save()
 
-  return res.json({
-    message: "update suceffully",
+  await user.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
     data: {
       id: user._id,
       name: user.name,
@@ -179,12 +213,10 @@ export const userProfile = asynchandler(async (req, res) => {
       phone: user.phone,
       role: user.role,
       sellerStatus: user.sellerStatus,
-      avatar: user.avatar
-    }
-  })
-
+      avatar: user.avatar,
+    },
+  });
 });
-
 
 export const rejectUser = asynchandler(async (req, res) => {
   const { id } = req.params

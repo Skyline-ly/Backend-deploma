@@ -18,6 +18,8 @@ import orderRoute from "./src/route/orderRoute.js";
 import ConversationRouter from "./src/route/conversationRoutes.js";
 import MessageRouter from "./src/route/messageRoutes.js";
 import AttributeRouter from "./src/route/attributeRoute.js";
+import WishlistRouter from "./src/route/wishListRoute.js";
+import ReviewRouter from "./src/route/reviewRoute.js";
 
 
 
@@ -56,6 +58,8 @@ app.use('/api/order',orderRoute)
 app.use('/api/conversation',ConversationRouter)
 app.use('/api/message',MessageRouter)
 app.use('/api/attribute',AttributeRouter)
+app.use('/api/wishlist',WishlistRouter)
+app.use('/api/review',ReviewRouter)
 
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
