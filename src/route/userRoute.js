@@ -6,6 +6,7 @@ import {
   rejectUser,
   searchUser,
   suspendUser,
+  unsuspendUser,
   unrejectUser,
   userPending,
   getMyProfile,
@@ -45,6 +46,13 @@ UserRouter.put(
   verifiveToken,
   authorizeRoles("admin"),
   suspendUser
+);
+
+UserRouter.put(
+  "/:id/unsuspend",
+  verifiveToken,
+  authorizeRoles("admin"),
+  unsuspendUser
 );
 
 UserRouter.put(

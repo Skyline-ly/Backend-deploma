@@ -121,7 +121,14 @@ export const deleteCategory=asynchandler(async (req, res) => {
 
 export const updateCategory = asynchandler(async (req, res) => {
     const { id } = req.params;
-    const { name, image } = req.body;
+    const { name } = req.body;
+
+    if (req.body.image !== undefined) {
+        return res.status(400).json({
+            success: false,
+            message: "Upload the image as a file using the image field"
+        });
+    }
 
     const category = await Category.findById(id);
 
@@ -162,19 +169,6 @@ export const updateCategory = asynchandler(async (req, res) => {
             url: req.file.path,
             publicId: req.file.filename
         };
-    } else if (image !== undefined) {
-        const imageUrl = typeof image === "string" ? image : image?.url;
-
-        if (typeof imageUrl !== "string" || !imageUrl.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Image must include a URL"
-            });
-        }
-
-        category.image = typeof image === "string"
-            ? { url: image.trim() }
-            : { ...image, url: imageUrl.trim() };
     }
 
     await category.save();
@@ -185,5 +179,4 @@ export const updateCategory = asynchandler(async (req, res) => {
         data: category
     });
 });
-
 

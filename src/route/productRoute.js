@@ -12,6 +12,7 @@ import {
 } from "../controller/productController.js";
 import { verifiveToken } from "../middleware/verifyToken.js";
 import { authorizeRoles } from "../middleware/catchByRole.js";
+import { requireApprovedSeller } from "../middleware/requireApprovedSeller.js";
 import upload from "../middleware/multer.js";
 
 
@@ -24,6 +25,7 @@ ProductRouter.get(
   "/mine",
   verifiveToken,
   authorizeRoles("seller"),
+  requireApprovedSeller,
   getMyProducts
 );
 ProductRouter.get(
@@ -45,6 +47,7 @@ ProductRouter.post(
   "/",
   verifiveToken,
   authorizeRoles("seller"),
+  requireApprovedSeller,
   upload.array("images", 5),
   createProduct
 );
@@ -53,6 +56,7 @@ ProductRouter.put(
   "/:id",
   verifiveToken,
   authorizeRoles("seller"),
+  requireApprovedSeller,
   upload.array("images", 5),
   updateProduct
 );
@@ -61,6 +65,7 @@ ProductRouter.delete(
   "/:id",
   verifiveToken,
   authorizeRoles("seller"),
+  requireApprovedSeller,
   deleteProduct
 );
 

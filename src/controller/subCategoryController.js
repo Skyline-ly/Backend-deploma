@@ -51,10 +51,9 @@ export const getSubcategory=asynchandler(async(req,res)=>{
     })
 })
 export const createSubcategory=asynchandler(async(req,res)=>{
-    const {name,image,category}=req.body
-    const imageUrl = typeof image === 'string' ? image : image?.url
+    const {name,category}=req.body
     if(typeof name !== 'string' || !name.trim() ||
-        typeof imageUrl !== 'string' || !imageUrl.trim() || !category){
+        !req.file?.path || !category){
         return res.status(400).json({
             success: false,
             message:'All fields are required'
@@ -72,7 +71,10 @@ export const createSubcategory=asynchandler(async(req,res)=>{
     
     const subcategory=await Subcategory.create({
         name:normalizedName,
-        image: typeof image === 'string' ? { url: image.trim() } : { ...image, url: imageUrl.trim() },
+        image: {
+            url: req.file.path,
+            publicId: req.file.filename
+        },
         category,
         createdBy:req.user.userId
     })
@@ -110,7 +112,15 @@ export const deleteSubcategory=asynchandler(async(req,res)=>{
 })
 export const updateSubcategoy=asynchandler(async(req,res)=>{
     const {id}=req.params
-    const {image,name,category}=req.body
+    const {name,category}=req.body
+
+    if (req.body.image !== undefined) {
+        return res.status(400).json({
+            success: false,
+            message: 'Upload the image as a file using the image field'
+        })
+    }
+
     const subcategory=await Subcategory.findById(id)
 
     if(!subcategory){
@@ -129,17 +139,11 @@ export const updateSubcategoy=asynchandler(async(req,res)=>{
         }
         subcategory.name=name.trim().toLowerCase()
     }
-    if(image !==undefined){
-        const imageUrl = typeof image === 'string' ? image : image?.url
-        if (typeof imageUrl !== 'string' || !imageUrl.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Image must include a URL'
-            })
+    if(req.file?.path){
+        subcategory.image = {
+            url: req.file.path,
+            publicId: req.file.filename
         }
-        subcategory.image = typeof image === 'string'
-            ? { url: image.trim() }
-            : { ...image, url: imageUrl.trim() }
     }
     if(category !==undefined){
         subcategory.category=category

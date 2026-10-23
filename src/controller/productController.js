@@ -1,6 +1,15 @@
 import asyncHandler from "express-async-handler";
 import mongoose from "mongoose";
 import { Product } from "../model/Product.js";
+import { User } from "../model/User.js";
+
+async function getApprovedSellerIds() {
+  return User.distinct("_id", {
+    role: "seller",
+    sellerStatus: "approved",
+    isActive: true,
+  });
+}
 
 function parseJsonField(value, fieldName, fallback) {
   if (value === undefined || value === "") return fallback;
@@ -34,21 +43,32 @@ export const createProduct = asyncHandler(async (req, res) => {
     brand,
     attributes: attributesInput,
     variants: variantsInput,
-    images: imagesInput,
     condition,
   } = req.body;
   let attributes;
   let variants;
-  let images;
 
   try {
     attributes = parseJsonField(attributesInput, "Attributes", {});
     variants = parseJsonField(variantsInput, "Variants", []);
-    images = parseJsonField(imagesInput, "Images", []);
   } catch (error) {
     return res.status(error.statusCode || 400).json({
       success: false,
       message: error.message,
+    });
+  }
+
+  if (req.body.images !== undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "Upload product images as files using the images field",
+    });
+  }
+
+  if (!req.files?.length) {
+    return res.status(400).json({
+      success: false,
+      message: "At least one product image file is required",
     });
   }
 
@@ -125,7 +145,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     brand: brand || null,
     attributes: attributes || {},
     variants: variants || [],
-    images: [...(Array.isArray(images) ? images : []), ...uploadedProductImages(req.files)],
+    images: uploadedProductImages(req.files),
     condition: condition || "new",
     seller: req.user.userId,
     approvalStatus: "pending",
@@ -139,9 +159,81 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const getMyProducts = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
+  const page = Number(req.query.page ?? 1);
+  const limit = Number(req.query.limit ?? 10);
+  if (
+    !Number.isSafeInteger(page) ||
+    !Number.isSafeInteger(limit) ||
+    page < 1 ||
+    limit < 1 ||
+    limit > 100
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Page must be positive and limit must be between 1 and 100",
+    });
+  }
+
+  const query = {
+    seller: req.user.userId,
+    isActive: true,
+  };
+  const { fromDate, toDate } = req.query;
+
+  if (fromDate || toDate) {
+    const dateRange = {};
+    const parseDate = (value) => {
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return null;
+      }
+
+      const date = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+        return null;
+      }
+
+      return date;
+    };
+
+    if (fromDate) {
+      const startDate = parseDate(fromDate);
+      if (!startDate) {
+        return res.status(400).json({
+          success: false,
+          message: "fromDate must be a valid date in YYYY-MM-DD format",
+        });
+      }
+      dateRange.$gte = startDate;
+    }
+
+    if (toDate) {
+      const endDate = parseDate(toDate);
+      if (!endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "toDate must be a valid date in YYYY-MM-DD format",
+        });
+      }
+      endDate.setUTCDate(endDate.getUTCDate() + 1);
+      dateRange.$lt = endDate;
+    }
+
+    if (
+      dateRange.$gte &&
+      dateRange.$lt &&
+      dateRange.$gte >= dateRange.$lt
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "fromDate must be on or before toDate",
+      });
+    }
+
+    query.createdAt = dateRange;
+  }
+
   const products = await Product.paginate(
-    { seller: req.user.userId, isActive: true },
+    query,
     {
       page: Number(page),
       limit: Number(limit),
@@ -240,6 +332,8 @@ export const reviewProduct = asyncHandler(async (req, res) => {
     });
   }
 
+  product.status='approved'
+
   return res.status(200).json({
     success: true,
     message: `Product ${status} successfully`,
@@ -257,10 +351,12 @@ export const getProductById = asyncHandler(async (req, res) => {
     });
   }
 
+  const approvedSellerIds = await getApprovedSellerIds();
   const product = await Product.findOne({
     _id: id,
     isActive: true,
     approvalStatus: { $in: ["approved", null] },
+    seller: { $in: approvedSellerIds },
   })
     .populate("category", "name")
     .populate("subCategory", "name")
@@ -297,6 +393,7 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   const query = {
     isActive: true,
     approvalStatus: { $in: ["approved", null] },
+    seller: { $in: await getApprovedSellerIds() },
   };
 
   if (search && search.trim()) {
@@ -439,21 +536,25 @@ export const updateProduct = asyncHandler(async (req, res) => {
     brand,
     attributes: attributesInput,
     variants: variantsInput,
-    images: imagesInput,
     condition,
   } = req.body;
   let attributes;
   let variants;
-  let images;
 
   try {
     attributes = parseJsonField(attributesInput, "Attributes", undefined);
     variants = parseJsonField(variantsInput, "Variants", undefined);
-    images = parseJsonField(imagesInput, "Images", undefined);
   } catch (error) {
     return res.status(error.statusCode || 400).json({
       success: false,
       message: error.message,
+    });
+  }
+
+  if (req.body.images !== undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "Upload product images as files using the images field",
     });
   }
 
@@ -561,10 +662,6 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
   if (variants !== undefined) {
     product.variants = variants;
-  }
-
-  if (images !== undefined) {
-    product.images = images;
   }
 
   if (req.files?.length) {

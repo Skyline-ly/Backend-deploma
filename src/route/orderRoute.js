@@ -6,12 +6,14 @@ import {
   getMyOrders,
   getOrderById,
   getSellerOrders,
+  getSellerSales,
   updateOrderStatus,
   cancelOrder,
   confirmOrderReceived,
 } from "../controller/orderContoller.js";
 import { verifiveToken } from "../middleware/verifyToken.js";
 import { authorizeRoles } from "../middleware/catchByRole.js";
+import { requireApprovedSeller } from "../middleware/requireApprovedSeller.js";
 
 
 
@@ -47,9 +49,18 @@ orderRoute.patch(
 
 
 orderRoute.get(
+  "/seller/sales",
+  verifiveToken,
+  authorizeRoles("seller"),
+  requireApprovedSeller,
+  getSellerSales
+);
+
+orderRoute.get(
   "/seller",
   verifiveToken,
   authorizeRoles("seller"),
+  requireApprovedSeller,
   getSellerOrders
 );
 
@@ -66,6 +77,7 @@ orderRoute.patch(
   "/:id/status",
   verifiveToken,
   authorizeRoles("seller", "admin"),
+  requireApprovedSeller,
   updateOrderStatus
 );
 

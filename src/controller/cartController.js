@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 import { Product } from "../model/Product.js";
 import { Cart } from "../model/cart.js";
+import { User } from "../model/User.js";
 
 
 export const addCartItem = asyncHandler(async (req, res) => {
@@ -43,6 +44,20 @@ export const addCartItem = asyncHandler(async (req, res) => {
   });
 
   if (!product) {
+    return res.status(404).json({
+      success: false,
+      message: "Product not found",
+    });
+  }
+
+  const approvedSeller = await User.exists({
+    _id: product.seller,
+    role: "seller",
+    sellerStatus: "approved",
+    isActive: true,
+  });
+
+  if (!approvedSeller) {
     return res.status(404).json({
       success: false,
       message: "Product not found",
@@ -149,7 +164,7 @@ export const getCartItems = asyncHandler(async (req, res) => {
       "name basePrice discountPrice images variants seller condition",
     populate: {
       path: "seller",
-      select: "name",
+      select: "name sellerStatus",
     },
   });
 

@@ -1,39 +1,21 @@
 import mongoose from "mongoose";
-
-async function removeObsoleteCartIndex() {
-  const database = mongoose.connection.db;
-  if (!database) {
-    throw new Error("MongoDB connection is not available");
-  }
-
-  const cartCollectionExists = await database
-    .listCollections({ name: "carts" }, { nameOnly: true })
-    .hasNext();
-  if (!cartCollectionExists) return;
-
-  const carts = database.collection("carts");
-  const indexes = await carts.indexes();
-  const obsoleteIndexes = indexes.filter(
-    (index) =>
-      index.name !== "_id_" &&
-      index.unique === true &&
-      Object.keys(index.key).some((key) => key.startsWith("items.")),
-  );
-
-  for (const index of obsoleteIndexes) {
-    await carts.dropIndex(index.name);
-    console.info(`Removed obsolete MongoDB cart index: ${index.name}`);
-  }
-}
+import { removeObsoleteCartIndex } from "./cartIndexMigration.js";
 
 export const dbConnect = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URL);
+    const mongoUrl = process.env.MONGODB_URL;
+
+    if (!mongoUrl) {
+      throw new Error("MONGODB_URL environment variable is missing");
+    }
+
+    await mongoose.connect(mongoUrl);
+
     await removeObsoleteCartIndex();
-    console.log("Database connected successfully");
+
+    console.info("Database connected successfully");
   } catch (error) {
-    console.error("Database connection or index migration failed");
-    console.error(error);
+    console.error("Database connection or migration failed:", error);
     process.exit(1);
   }
 };

@@ -121,13 +121,18 @@ export const createOrder = asyncHandler(async (req, res) => {
         subtotal += itemSubtotal;
 
     
-        const seller = await User.findById(product.seller)
+        const seller = await User.findOne({
+          _id: product.seller,
+          role: "seller",
+          sellerStatus: "approved",
+          isActive: true,
+        })
           .select("_id")
           .session(session);
 
         if (!seller) {
           const error = new Error(
-            `Seller not found for ${product.name}`
+            `${product.name} is unavailable because its seller is not active`
           );
           error.statusCode = 400;
           throw error;
@@ -291,13 +296,147 @@ export const getSellerOrders = asyncHandler(async (req, res) => {
     sort: {
       createdAt: -1,
     },
+    populate: {
+      path: "customer",
+      select: "name",
+    },
   };
 
   const orders = await Order.paginate(query, options);
+  const sellerOrders = orders.docs.map((order) => {
+    const sellerOrder = order.toObject();
+    sellerOrder.items = sellerOrder.items.filter(
+      (item) => item.seller.toString() === sellerId.toString()
+    );
+    sellerOrder.sellerSubtotal = sellerOrder.items.reduce(
+      (sum, item) => sum + item.subtotal,
+      0
+    );
+    delete sellerOrder.subtotal;
+    delete sellerOrder.totalAmount;
+    return sellerOrder;
+  });
 
   return res.status(200).json({
     success: true,
-    data: orders,
+    data: {
+      ...orders,
+      docs: sellerOrders,
+    },
+  });
+});
+
+export const getSellerSales = asyncHandler(async (req, res) => {
+  const sellerId = new mongoose.Types.ObjectId(req.user.userId);
+  const page = Number(req.query.page ?? 1);
+  const limit = Number(req.query.limit ?? 20);
+
+  if (
+    !Number.isSafeInteger(page) ||
+    !Number.isSafeInteger(limit) ||
+    page < 1 ||
+    limit < 1 ||
+    limit > 100
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Page must be positive and limit must be between 1 and 100",
+    });
+  }
+
+  const saleStatuses = [
+    "Paid",
+    "Packing",
+    "In Transit",
+    "Delivered",
+    "Completed",
+    "Confirmed",
+    "Processing",
+    "Ready for Pickup",
+    "Picked Up",
+  ];
+
+  const [report] = await Order.aggregate([
+    {
+      $match: {
+        status: { $in: saleStatuses },
+        "items.seller": sellerId,
+      },
+    },
+    { $unwind: "$items" },
+    { $match: { "items.seller": sellerId } },
+    {
+      $facet: {
+        products: [
+          {
+            $group: {
+              _id: "$items.product",
+              productName: { $first: "$items.productName" },
+              unitsSold: { $sum: "$items.quantity" },
+              grossSales: { $sum: "$items.subtotal" },
+              orderIds: { $addToSet: "$_id" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              productId: "$_id",
+              productName: 1,
+              unitsSold: 1,
+              grossSales: 1,
+              orderCount: { $size: "$orderIds" },
+            },
+          },
+          { $sort: { grossSales: -1, productName: 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+        ],
+        metadata: [
+          { $group: { _id: "$items.product" } },
+          { $count: "totalDocs" },
+        ],
+        summary: [
+          {
+            $group: {
+              _id: null,
+              unitsSold: { $sum: "$items.quantity" },
+              grossSales: { $sum: "$items.subtotal" },
+              orderIds: { $addToSet: "$_id" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              unitsSold: 1,
+              grossSales: 1,
+              orderCount: { $size: "$orderIds" },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const products = report?.products || [];
+  const totalDocs = report?.metadata?.[0]?.totalDocs || 0;
+  const summary = report?.summary?.[0] || {
+    unitsSold: 0,
+    grossSales: 0,
+    orderCount: 0,
+  };
+
+  return res.status(200).json({
+    success: true,
+    data: products,
+    summary,
+    pagination: {
+      totalDocs,
+      totalPages: Math.ceil(totalDocs / limit),
+      page,
+      limit,
+      hasNextPage: page * limit < totalDocs,
+      hasPrevPage: page > 1,
+    },
   });
 });
 

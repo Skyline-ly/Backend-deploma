@@ -46,8 +46,6 @@ app.use(
   })
 );
 
-
-
 app.use("/api/auth",AuthRouter );
 app.use('/api/user',UserRouther)
 app.use('/api/categories',CategoryRouter)

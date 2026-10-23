@@ -4,10 +4,9 @@ import { Brand } from '../model/Brand.js'
 
 
 export const createBrand= asynhandler(async(req,res)=>{
-    const {name,image,category,subCategory}=req.body
-    const imageUrl = typeof image === "string" ? image : image?.url
+    const {name,category,subCategory}=req.body
     if(typeof name !== "string" || !name.trim() ||
-        typeof imageUrl !== "string" || !imageUrl.trim() ||
+        !req.file?.path ||
         !category || !subCategory){
         return res.status(400).json({
             success: false,
@@ -26,7 +25,10 @@ export const createBrand= asynhandler(async(req,res)=>{
     }
     const brand=await Brand.create({
         name:analy,
-        image: typeof image === "string" ? { url: image.trim() } : { ...image, url: imageUrl.trim() },
+        image: {
+            url: req.file.path,
+            publicId: req.file.filename
+        },
         category,
         subCategory,
         createdBy:req.user.userId
@@ -50,7 +52,14 @@ export const createBrand= asynhandler(async(req,res)=>{
 export const updateBrand=asynhandler(async(req,res)=>{
 
     const {id}=req.params
-    const {image,category,name,subCategory}=req.body
+    const {category,name,subCategory}=req.body
+
+    if (req.body.image !== undefined) {
+        return res.status(400).json({
+            success: false,
+            message: "Upload the image as a file using the image field"
+        })
+    }
 
     const brand=await Brand.findById(id)
 
@@ -76,17 +85,11 @@ export const updateBrand=asynhandler(async(req,res)=>{
     if(subCategory !==undefined){
         brand.subCategory=subCategory
     }
-    if(image !==undefined){
-        const imageUrl = typeof image === "string" ? image : image?.url
-        if (typeof imageUrl !== "string" || !imageUrl.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Image must include a URL"
-            })
+    if(req.file?.path){
+        brand.image = {
+            url: req.file.path,
+            publicId: req.file.filename
         }
-        brand.image = typeof image === "string"
-            ? { url: image.trim() }
-            : { ...image, url: imageUrl.trim() }
     }
     await brand.save()
 
@@ -174,7 +177,6 @@ export const deleteBrand=asynhandler(async (req, res) => {
             data: brand
         });
 })
-
 
 
 
