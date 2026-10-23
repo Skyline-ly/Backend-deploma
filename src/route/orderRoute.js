@@ -8,6 +8,7 @@ import {
   getSellerOrders,
   updateOrderStatus,
   cancelOrder,
+  confirmOrderReceived,
 } from "../controller/orderContoller.js";
 import { verifiveToken } from "../middleware/verifyToken.js";
 import { authorizeRoles } from "../middleware/catchByRole.js";
@@ -35,6 +36,13 @@ orderRoute.patch(
   verifiveToken,
   authorizeRoles("customer"),
   cancelOrder
+);
+
+orderRoute.patch(
+  "/:id/confirm-received",
+  verifiveToken,
+  authorizeRoles("customer"),
+  confirmOrderReceived
 );
 
 

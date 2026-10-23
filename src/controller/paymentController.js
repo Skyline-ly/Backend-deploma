@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 import { Payment } from "../model/Payment.js";
 import { Order } from "../model/Order.js";
+import { Product } from "../model/Product.js";
 import {
     generateKhqr,
     checkBakongPayment,
@@ -244,6 +245,59 @@ export const verifyPayment = asyncHandler(async (req, res) => {
                 );
             }
 
+            for (const item of currentOrder.items) {
+                const product = await Product.findOne({
+                    _id: item.product,
+                    isActive: true,
+                    approvalStatus: { $in: ["approved", null] },
+                }).session(session);
+
+                if (!product) {
+                    const error = new Error(
+                        `${item.productName} is no longer available`
+                    );
+                    error.statusCode = 409;
+                    throw error;
+                }
+
+                if (item.variantId) {
+                    const variant = product.variants.id(item.variantId);
+                    if (!variant) {
+                        const error = new Error(
+                            `The selected variant for ${item.productName} is no longer available`
+                        );
+                        error.statusCode = 409;
+                        throw error;
+                    }
+                    if (variant.stock < item.quantity) {
+                        const error = new Error(
+                            `Insufficient stock for ${item.productName}`
+                        );
+                        error.statusCode = 409;
+                        throw error;
+                    }
+                    variant.stock -= item.quantity;
+                } else {
+                    if (product.variants.length > 0) {
+                        const error = new Error(
+                            `${item.productName} now requires a variant selection`
+                        );
+                        error.statusCode = 409;
+                        throw error;
+                    }
+                    if (product.stock < item.quantity) {
+                        const error = new Error(
+                            `Insufficient stock for ${item.productName}`
+                        );
+                        error.statusCode = 409;
+                        throw error;
+                    }
+                    product.stock -= item.quantity;
+                }
+
+                await product.save({ session });
+            }
+
             currentPayment.status = "Paid";
             currentPayment.transactionId =
                 result.transactionId || null;
@@ -253,6 +307,11 @@ export const verifyPayment = asyncHandler(async (req, res) => {
 
             await currentPayment.save({ session });
             await currentOrder.save({ session });
+        });
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.message || "Failed to verify payment",
         });
     } finally {
         await session.endSession();
@@ -297,4 +356,3 @@ export const getPaymentById = asyncHandler(async (req, res) => {
         data: payment,
     });
 });
-

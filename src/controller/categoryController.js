@@ -5,16 +5,15 @@ import { Category } from '../model/Category.js'
 export const createCategory = asynchandler(async (req, res) => {
 
     const { name } = req.body;
-    const {image}=req.file;
 
-    if (!name) {
+    if (typeof name !== "string" || !name.trim()) {
         return res.status(400).json({
             success: false,
             message: "Category name is required"
         });
     }
 
-    if (!image) {
+    if (!req.file?.path) {
         return res.status(400).json({
             success: false,
             message: "Category image is required"
@@ -36,7 +35,10 @@ export const createCategory = asynchandler(async (req, res) => {
 
     const category = await Category.create({
         name: analy,
-        image: req.file.path,
+        image: {
+            url: req.file.path,
+            publicId: req.file.filename
+        },
         createdBy: req.user.userId
     });
 
@@ -86,7 +88,7 @@ export const getAllcategory=asynchandler(async(req,res)=>{
 
     return res.status(200).json({
         success: true,
-        count: category.length,
+        count: category.totalDocs,
         data: category
     })
 
@@ -131,6 +133,13 @@ export const updateCategory = asynchandler(async (req, res) => {
     }
 
     if (name !== undefined) {
+        if (typeof name !== "string" || !name.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "Category name cannot be empty"
+            });
+        }
+
         const normalizedName = name.trim().toLowerCase();
 
         const exists = await Category.findOne({
@@ -148,8 +157,24 @@ export const updateCategory = asynchandler(async (req, res) => {
         category.name = normalizedName;
     }
 
-    if (image !== undefined) {
-        category.image = image;
+    if (req.file?.path) {
+        category.image = {
+            url: req.file.path,
+            publicId: req.file.filename
+        };
+    } else if (image !== undefined) {
+        const imageUrl = typeof image === "string" ? image : image?.url;
+
+        if (typeof imageUrl !== "string" || !imageUrl.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "Image must include a URL"
+            });
+        }
+
+        category.image = typeof image === "string"
+            ? { url: image.trim() }
+            : { ...image, url: imageUrl.trim() };
     }
 
     await category.save();
@@ -160,6 +185,5 @@ export const updateCategory = asynchandler(async (req, res) => {
         data: category
     });
 });
-
 
 

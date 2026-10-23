@@ -50,6 +50,7 @@ export const createOrder = asyncHandler(async (req, res) => {
         const product = await Product.findOne({
           _id: cartItem.product,
           isActive: true,
+          approvalStatus: { $in: ["approved", null] },
         }).session(session);
 
         if (!product) {
@@ -98,8 +99,6 @@ export const createOrder = asyncHandler(async (req, res) => {
             throw error;
           }
 
-         
-          variant.stock -= cartItem.quantity;
         }
 
        
@@ -115,8 +114,6 @@ export const createOrder = asyncHandler(async (req, res) => {
             throw error;
           }
 
-        
-          product.stock -= cartItem.quantity;
         }
 
         const itemSubtotal = price * cartItem.quantity;
@@ -149,7 +146,6 @@ export const createOrder = asyncHandler(async (req, res) => {
           subtotal: itemSubtotal,
         });
 
-        await product.save({ session });
       }
 
   
@@ -313,24 +309,6 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  const allowedStatuses = [
-    "Pending",
-    "Paid",
-    "Confirmed",
-    "Processing",
-    "Ready for Pickup",
-    "Picked Up",
-    "Completed",
-    "Cancelled",
-  ];
-
-  if (!allowedStatuses.includes(status)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid order status",
-    });
-  }
-
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({
       success: false,
@@ -353,59 +331,131 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     (item) => item.seller.toString() === userId.toString()
   );
 
-  if (!isAdmin && !isSellerInOrder) {
+  if (userRole === "seller" && !isSellerInOrder) {
     return res.status(403).json({
       success: false,
       message: "You are not authorized to update this order",
     });
   }
 
+  const nextStatus = {
+    Paid: "Packing",
+    Packing: "In Transit",
+    "In Transit": "Delivered",
+    // Preserve the previous pickup progression for existing orders.
+    Confirmed: "Processing",
+    Processing: "Ready for Pickup",
+    "Ready for Pickup": "Picked Up",
+  }[order.status];
 
-  if (status === "Cancelled" && !isAdmin) {
+  if (status === "Paid") {
     return res.status(403).json({
       success: false,
-      message: "Only admin can cancel an order from this endpoint",
+      message: "Only verified payment can mark an order as paid",
     });
   }
 
-
-  if (
-    ["Confirmed", "Processing", "Ready for Pickup", "Picked Up", "Completed"].includes(
-      status
-    ) &&
-    !["Paid", "Confirmed", "Processing", "Ready for Pickup", "Picked Up"].includes(
-      order.status
-    )
-  ) {
+  if (status === "Completed") {
     return res.status(400).json({
       success: false,
-      message: "Order must be paid before processing",
+      message: "The customer must confirm receipt to complete the order",
     });
   }
 
+  if (status === "Cancelled") {
+    if (!isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Only an admin can cancel an order from this endpoint",
+      });
+    }
+    if (order.status !== "Pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending orders can be cancelled",
+      });
+    }
 
-  if (order.status === "Completed") {
+    const cancelledOrder = await Order.findOneAndUpdate(
+      { _id: id, status: "Pending" },
+      { $set: { status: "Cancelled", cancelledAt: new Date() } },
+      { new: true }
+    );
+    if (!cancelledOrder) {
+      return res.status(409).json({
+        success: false,
+        message: "Order status changed before it could be cancelled",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order cancelled successfully",
+      data: cancelledOrder,
+    });
+  }
+
+  if (!["seller", "admin"].includes(userRole)) {
+    return res.status(403).json({
+      success: false,
+      message: "You are not authorized to update this order",
+    });
+  }
+
+  if (status !== nextStatus) {
     return res.status(400).json({
       success: false,
-      message: "Completed orders cannot be updated",
+      message: `Invalid order status transition from ${order.status} to ${status}`,
     });
   }
 
   order.status = status;
-
-  if (status === "Completed") {
-    order.completedAt = new Date();
-  }
-
-  if (status === "Cancelled") {
-    order.cancelledAt = new Date();
-  }
 
   await order.save();
 
   return res.status(200).json({
     success: true,
     message: "Order status updated successfully",
+    data: order,
+  });
+});
+
+export const confirmOrderReceived = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid order ID",
+    });
+  }
+
+  const order = await Order.findOne({
+    _id: id,
+    customer: req.user.userId,
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: "Order not found",
+    });
+  }
+
+  if (order.status !== "Delivered") {
+    return res.status(400).json({
+      success: false,
+      message: "You can confirm receipt after the order is marked as delivered",
+    });
+  }
+
+  order.status = "Completed";
+  order.completedAt = new Date();
+  await order.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Order receipt confirmed",
     data: order,
   });
 });
@@ -436,25 +486,34 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     });
   }
 
- 
-  const cancellableStatuses = ["Pending", "Paid"];
-
-  if (!cancellableStatuses.includes(order.status)) {
+  if (order.status !== "Pending") {
     return res.status(400).json({
       success: false,
-      message: "This order can no longer be cancelled",
+      message: "Only pending orders can be cancelled",
     });
   }
 
-  order.status = "Cancelled";
-  order.cancelledAt = new Date();
-  order.cancellationReason = cancellationReason?.trim() || null;
-
-  await order.save();
+  const cancelledOrder = await Order.findOneAndUpdate(
+    { _id: id, customer: userId, status: "Pending" },
+    {
+      $set: {
+        status: "Cancelled",
+        cancelledAt: new Date(),
+        cancellationReason: cancellationReason?.trim() || null,
+      },
+    },
+    { new: true }
+  );
+  if (!cancelledOrder) {
+    return res.status(409).json({
+      success: false,
+      message: "Order status changed before it could be cancelled",
+    });
+  }
 
   return res.status(200).json({
     success: true,
     message: "Order cancelled successfully",
-    data: order,
+    data: cancelledOrder,
   });
 });

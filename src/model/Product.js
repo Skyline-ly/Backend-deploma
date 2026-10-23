@@ -129,6 +129,19 @@ const productSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true,
+    },
+
+    reviewNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
   {
     timestamps: true,

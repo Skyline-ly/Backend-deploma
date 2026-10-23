@@ -20,7 +20,7 @@ const orderItemSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Snapshot
+   
     productName: {
       type: String,
       required: true,
@@ -113,6 +113,10 @@ const orderSchema = new mongoose.Schema(
       enum: [
         "Pending",
         "Paid",
+        "Packing",
+        "In Transit",
+        "Delivered",
+        // Keep existing values readable for orders created before delivery tracking.
         "Confirmed",
         "Processing",
         "Ready for Pickup",

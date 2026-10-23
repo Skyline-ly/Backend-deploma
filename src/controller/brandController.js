@@ -5,7 +5,10 @@ import { Brand } from '../model/Brand.js'
 
 export const createBrand= asynhandler(async(req,res)=>{
     const {name,image,category,subCategory}=req.body
-    if(!name || !image ||!category ||!subCategory){
+    const imageUrl = typeof image === "string" ? image : image?.url
+    if(typeof name !== "string" || !name.trim() ||
+        typeof imageUrl !== "string" || !imageUrl.trim() ||
+        !category || !subCategory){
         return res.status(400).json({
             success: false,
             message:'All fields are required'
@@ -23,7 +26,7 @@ export const createBrand= asynhandler(async(req,res)=>{
     }
     const brand=await Brand.create({
         name:analy,
-        image,
+        image: typeof image === "string" ? { url: image.trim() } : { ...image, url: imageUrl.trim() },
         category,
         subCategory,
         createdBy:req.user.userId
@@ -59,6 +62,12 @@ export const updateBrand=asynhandler(async(req,res)=>{
     }
 
     if(name !==undefined){
+        if (typeof name !== "string" || !name.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "Brand name cannot be empty"
+            })
+        }
         brand.name=name.trim().toLowerCase()
     }
     if(category !==undefined){
@@ -68,7 +77,16 @@ export const updateBrand=asynhandler(async(req,res)=>{
         brand.subCategory=subCategory
     }
     if(image !==undefined){
-        brand.image=image
+        const imageUrl = typeof image === "string" ? image : image?.url
+        if (typeof imageUrl !== "string" || !imageUrl.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "Image must include a URL"
+            })
+        }
+        brand.image = typeof image === "string"
+            ? { url: image.trim() }
+            : { ...image, url: imageUrl.trim() }
     }
     await brand.save()
 
@@ -93,20 +111,33 @@ export const getBrand=asynhandler(async(req,res)=>{
     if(subCategory){
         query.subCategory=subCategory
     }
-    const brand=await Brand.find(query,{page,limit})
-    .populate("category","name")
-    .populate("subCategory","name")
+    const result=await Brand.paginate(query,{
+        page,
+        limit,
+        populate: [
+            { path: "category", select: "name" },
+            { path: "subCategory", select: "name" }
+        ]
+    })
 
     return res.status(200).json({
         success: true,
-        count:brand.length,
-        data:brand
+        count: result.totalDocs,
+        data: result.docs,
+        pagination: {
+            totalDocs: result.totalDocs,
+            totalPages: result.totalPages,
+            page: result.page,
+            limit: result.limit,
+            hasNextPage: result.hasNextPage,
+            hasPrevPage: result.hasPrevPage
+        }
     })
 })
 export const getBrandById=asynhandler(async(req,res)=>{
     const {id}=req.params
     
-    const brand=await Brand.findById(id)
+    const brand=await Brand.findOne({_id:id,isActive:true})
 
     if(!brand){
         return res.status(404).json({
@@ -114,7 +145,7 @@ export const getBrandById=asynhandler(async(req,res)=>{
             message:'brand not found'
         })
     }
-    return res.status(201).json({
+    return res.status(200).json({
         success:true,
         data:brand
     })
@@ -143,8 +174,6 @@ export const deleteBrand=asynhandler(async (req, res) => {
             data: brand
         });
 })
-
-
 
 
 

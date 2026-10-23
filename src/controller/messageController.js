@@ -129,7 +129,7 @@ export const getMessages = asyncHandler(
       });
     }
 
-    // Get messages
+  
     const messages = await Message.find({
       conversation: conversationId,
     })

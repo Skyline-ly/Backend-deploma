@@ -14,7 +14,7 @@ CategoryRouter.get('/:id',getCategoryId)
  CategoryRouter.post('/create',verifiveToken,authorizeRoles('admin'),upload.single('image')
 ,createCategory)
 
-CategoryRouter.put('/:id/update',verifiveToken,authorizeRoles('admin'),updateCategory)
+CategoryRouter.put('/:id/update',verifiveToken,authorizeRoles('admin'),upload.single('image'),updateCategory)
 
 CategoryRouter.delete('/:id/delete',verifiveToken,authorizeRoles('admin'),deleteCategory)
 

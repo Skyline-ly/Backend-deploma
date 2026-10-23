@@ -1,28 +1,60 @@
 import asynchandler from 'express-async-handler'
+import mongoose from 'mongoose'
 import { Subcategory } from '../model/Subcategory.js'
 
 
 export const getSubcategory=asynchandler(async(req,res)=>{
-    const{page=10,limit=1,search,category}=req.query
+    const{page=1,limit=10,search,category}=req.query
+    const pageNumber = Number(page)
+    const limitNumber = Number(limit)
+
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 ||
+        !Number.isInteger(limitNumber) || limitNumber < 1 || limitNumber > 100) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid pagination values'
+        })
+    }
 
     const query={isActive:true}
 
-    if(search.trim()){
-        query.search={$regex:search,$options:'i'}
+    if(typeof search === 'string' && search.trim()){
+        query.name={$regex:search.trim(),$options:'i'}
     }
     if(category){
+        if (!mongoose.Types.ObjectId.isValid(category)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid category ID'
+            })
+        }
         query.category=category
     }
-    const subCategory=await Subcategory.find(query,{page,limit}).populate('category',name)
+    const [subCategory, count] = await Promise.all([
+        Subcategory.find(query)
+            .populate('category', 'name')
+            .sort({ createdAt: -1 })
+            .skip((pageNumber - 1) * limitNumber)
+            .limit(limitNumber),
+        Subcategory.countDocuments(query)
+    ])
 
     return res.status(200).json({
         success:true,
-        subCategory
+        count,
+        subCategory,
+        pagination: {
+            page: pageNumber,
+            limit: limitNumber,
+            totalPages: Math.ceil(count / limitNumber)
+        }
     })
 })
 export const createSubcategory=asynchandler(async(req,res)=>{
     const {name,image,category}=req.body
-    if(!name || !image ||!category){
+    const imageUrl = typeof image === 'string' ? image : image?.url
+    if(typeof name !== 'string' || !name.trim() ||
+        typeof imageUrl !== 'string' || !imageUrl.trim() || !category){
         return res.status(400).json({
             success: false,
             message:'All fields are required'
@@ -40,7 +72,7 @@ export const createSubcategory=asynchandler(async(req,res)=>{
     
     const subcategory=await Subcategory.create({
         name:normalizedName,
-        image,
+        image: typeof image === 'string' ? { url: image.trim() } : { ...image, url: imageUrl.trim() },
         category,
         createdBy:req.user.userId
     })
@@ -89,10 +121,25 @@ export const updateSubcategoy=asynchandler(async(req,res)=>{
     }
 
     if(name !==undefined){
+        if (typeof name !== 'string' || !name.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Subcategory name cannot be empty'
+            })
+        }
         subcategory.name=name.trim().toLowerCase()
     }
     if(image !==undefined){
-        subcategory.image=image
+        const imageUrl = typeof image === 'string' ? image : image?.url
+        if (typeof imageUrl !== 'string' || !imageUrl.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Image must include a URL'
+            })
+        }
+        subcategory.image = typeof image === 'string'
+            ? { url: image.trim() }
+            : { ...image, url: imageUrl.trim() }
     }
     if(category !==undefined){
         subcategory.category=category

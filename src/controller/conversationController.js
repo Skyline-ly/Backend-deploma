@@ -100,16 +100,16 @@ export const getMyConversations = asyncHandler(
 export const getConversationById = asyncHandler(
   async (req, res) => {
     const userId = req.user.userId;
-    const { id } = req.params;
+    const { conversationId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid conversation ID",
       });
     }
 
-    const conversation = await Conversation.findById(id)
+    const conversation = await Conversation.findById(conversationId)
       .populate("customer", "name email")
       .populate("seller", "name email");
 

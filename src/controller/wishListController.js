@@ -9,7 +9,10 @@ export const getWishlist = asyncHandler(async (req, res) => {
     customer: req.user.userId,
   }).populate({
     path: "products",
-    match: { isActive: true },
+    match: {
+      isActive: true,
+      approvalStatus: { $in: ["approved", null] },
+    },
     select: "name basePrice discountPrice images stock variants condition seller",
   });
 
@@ -32,6 +35,7 @@ export const addToWishlist = asyncHandler(async (req, res) => {
   const product = await Product.findOne({
     _id: productId,
     isActive: true,
+    approvalStatus: { $in: ["approved", null] },
   });
 
   if (!product) {

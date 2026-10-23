@@ -1,5 +1,6 @@
 
 import asyncHandler from "express-async-handler";
+import mongoose from "mongoose";
 
 import { Product } from "../model/Product.js";
 import { Cart } from "../model/cart.js";
@@ -19,10 +20,10 @@ export const addCartItem = asyncHandler(async (req, res) => {
   }
 
 
-  if (!productId || !variantId) {
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
     return res.status(400).json({
       success: false,
-      message: "Product and variant are required",
+      message: "A valid product ID is required",
     });
   }
 
@@ -38,6 +39,7 @@ export const addCartItem = asyncHandler(async (req, res) => {
   const product = await Product.findOne({
     _id: productId,
     isActive: true,
+    approvalStatus: { $in: ["approved", null] },
   });
 
   if (!product) {
@@ -48,20 +50,39 @@ export const addCartItem = asyncHandler(async (req, res) => {
   }
 
 
-  const variant = product.variants.id(variantId);
+  let variant;
+  let availableStock;
 
-  if (!variant) {
-    return res.status(404).json({
-      success: false,
-      message: "Variant is not related to this product",
-    });
+  if (product.variants.length > 0) {
+    if (!mongoose.Types.ObjectId.isValid(variantId)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid variant ID is required for this product",
+      });
+    }
+
+    variant = product.variants.id(variantId);
+    if (!variant) {
+      return res.status(404).json({
+        success: false,
+        message: "Variant is not related to this product",
+      });
+    }
+    availableStock = variant.stock;
+  } else {
+    if (variantId) {
+      return res.status(400).json({
+        success: false,
+        message: "This product does not have variants",
+      });
+    }
+    availableStock = product.stock;
   }
 
-  
-  if (variant.stock < quantity) {
+  if (availableStock < quantity) {
     return res.status(400).json({
       success: false,
-      message: `Only ${variant.stock} items available`,
+      message: `Only ${availableStock} items available`,
     });
   }
 
@@ -82,17 +103,17 @@ export const addCartItem = asyncHandler(async (req, res) => {
   const existingItem = cart.items.find(
     (item) =>
       item.product.toString() === productId.toString() &&
-      item.variantId.toString() === variantId.toString()
+    (item.variantId?.toString() ?? null) === (variantId?.toString() ?? null)
   );
 
   if (existingItem) {
     const newQuantity = existingItem.quantity + quantity;
 
 
-    if (newQuantity > variant.stock) {
+    if (newQuantity > availableStock) {
       return res.status(400).json({
         success: false,
-        message: `Only ${variant.stock} items available`,
+        message: `Only ${availableStock} items available`,
       });
     }
 
@@ -101,7 +122,7 @@ export const addCartItem = asyncHandler(async (req, res) => {
     
     cart.items.push({
       product: productId,
-      variantId,
+      ...(variantId ? { variantId } : {}),
       quantity,
     });
   }
@@ -191,6 +212,7 @@ export const updateCartItem = asyncHandler(async (req, res) => {
   const product = await Product.findOne({
     _id: item.product,
     isActive: true,
+    approvalStatus: { $in: ["approved", null] },
   });
 
   if (!product) {
@@ -201,20 +223,32 @@ export const updateCartItem = asyncHandler(async (req, res) => {
   }
 
 
-  const variant = product.variants.id(item.variantId);
-
-  if (!variant) {
-    return res.status(404).json({
-      success: false,
-      message: "Variant is no longer available",
-    });
+  let availableStock;
+  if (product.variants.length > 0) {
+    const variant = item.variantId
+      ? product.variants.id(item.variantId)
+      : null;
+    if (!variant) {
+      return res.status(404).json({
+        success: false,
+        message: "Variant is no longer available",
+      });
+    }
+    availableStock = variant.stock;
+  } else {
+    if (item.variantId) {
+      return res.status(400).json({
+        success: false,
+        message: "This product no longer has variants",
+      });
+    }
+    availableStock = product.stock;
   }
 
- 
-  if (quantity > variant.stock) {
+  if (quantity > availableStock) {
     return res.status(400).json({
       success: false,
-      message: `Only ${variant.stock} items available`,
+      message: `Only ${availableStock} items available`,
     });
   }
 
