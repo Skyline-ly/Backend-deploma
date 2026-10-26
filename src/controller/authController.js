@@ -10,17 +10,18 @@ import asynchandler from 'express-async-handler'
 export const register = asynchandler(async (req, res) => {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
+    if (
+        typeof name !== "string" ||
+        !name.trim() ||
+        typeof email !== "string" ||
+        !email.trim() ||
+        typeof password !== "string" ||
+        password.length < 8 ||
+        Buffer.byteLength(password, "utf8") > 72
+    ) {
         return res.status(400).json({
             success: false,
-            message: 'All fields are required'
-        });
-    }
-
-    if (typeof email !== 'string') {
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid email format'
+            message: "Valid name, email, and password are required",
         });
     }
 
@@ -61,15 +62,22 @@ export const register = asynchandler(async (req, res) => {
 });
 
 
-export const login=asynchandler(async (req, res) => {
+export const login = asynchandler(async (req, res) => {
     const { email, password } = req.body
 
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' })
+    if (
+        typeof email !== "string" ||!email.trim() ||
+        typeof password !== "string" ||!password
+    ) 
+    {
+        return res.status(400).json({
+            success: false,
+            message: "Email and password are required",
+        });
     }
-    const normalizedEmail=email.trim().toLowerCase()
+    const normalizedEmail = email.trim().toLowerCase()
 
-    const user = await User.findOne({ email :normalizedEmail})
+    const user = await User.findOne({ email: normalizedEmail })
     if (!user) {
         return res.status(401).json({ message: 'Invalid email or password' })
     }
@@ -77,6 +85,7 @@ export const login=asynchandler(async (req, res) => {
     if (!user.isActive) {
         return res.status(403).json({ message: 'Your account has been deactivated' })
     }
+    
 
     const isPasswordValid = await bcrypt.compare(password, user.password)
     if (!isPasswordValid) {
@@ -84,30 +93,34 @@ export const login=asynchandler(async (req, res) => {
     }
 
     const secretKey = process.env.JWT_SECRET
-    const refreshSecretKey=process.env.REFRESH_TOKEN_SECRET
+    const refreshSecretKey = process.env.REFRESH_TOKEN_SECRET
     const accessToken = jwt.sign(
-        {    userId: user._id,         
-             role: user.role,
-             sellerStatus: user.sellerStatus },
+        {
+            userId: user._id,
+            role: user.role,
+            sellerStatus: user.sellerStatus
+        },
         secretKey,
         { expiresIn: '30m' }
     )
-    const refreshToken=jwt.sign(
-        { userId: user._id,
-            sellerStatus: user.sellerStatus },
+    const refreshToken = jwt.sign(
+        {
+            userId: user._id,
+            sellerStatus: user.sellerStatus
+        },
         refreshSecretKey,
         { expiresIn: '3d' }
 
     )
-    const tokenRefreshHash=await bcrypt.hash(refreshToken,12)
-    user.refreshToken=tokenRefreshHash
+    const tokenRefreshHash = await bcrypt.hash(refreshToken, 12)
+    user.refreshToken = tokenRefreshHash
     await user.save()
 
-     res.cookie('refreshToken', refreshToken, {
+    res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000
+        maxAge: 3 * 24 * 60 * 60 * 1000
     });
     return res.status(200).json({
         success: true,
