@@ -332,8 +332,6 @@ export const reviewProduct = asyncHandler(async (req, res) => {
     });
   }
 
-  product.status='approved'
-
   return res.status(200).json({
     success: true,
     message: `Product ${status} successfully`,
@@ -665,7 +663,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   }
 
   if (req.files?.length) {
-    product.images.push(...uploadedProductImages(req.files));
+    product.images = uploadedProductImages(req.files);
   }
 
   if (condition !== undefined) {
