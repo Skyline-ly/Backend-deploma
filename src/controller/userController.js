@@ -19,7 +19,11 @@ export const userPending = asynchandler(async (req, res) => {
 
 export const searchUser = asynchandler(async (req, res) => {
 
-  const { page = 1, limit = 10, search, sellerStatus, role } = req.query
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt(req.query.limit, 10) || 10)
+  );
 
   const query = {}
 
@@ -90,12 +94,15 @@ export const unsuspendUser = asynchandler(async (req, res) => {
     })
   }
 
-  if (user.sellerStatus !== 'suspended') {
+  if (
+    user.role !== 'seller' ||user.sellerStatus !== 'suspended'
+  ) {
     return res.status(400).json({
       success: false,
-      message: 'Seller is not suspended'
-    })
+      message: 'User is not a suspended seller'
+    });
   }
+
 
   user.sellerStatus = 'approved'
 
@@ -149,7 +156,7 @@ export const unrejectUser = asynchandler(async (req, res) => {
   })
 })
   ;
-  export const getMyProfile = asynchandler(async (req, res) => {
+export const getMyProfile = asynchandler(async (req, res) => {
   const user = await User.findById(req.user.userId).select(
     "name email phone role sellerStatus avatar createdAt"
   );
@@ -223,9 +230,9 @@ export const rejectUser = asynchandler(async (req, res) => {
   const user = await User.findById(id)
 
   if (!user) {
-    return res.json({
+    return res.status(404).json({
       success: false,
-      message: "user not fould"
+      message: "User not found"
     })
   }
   if (user.sellerStatus !== 'pending') {
