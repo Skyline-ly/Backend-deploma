@@ -77,7 +77,7 @@ export const login = asynchandler(async (req, res) => {
     }
     const normalizedEmail = email.trim().toLowerCase()
 
-    const user = await User.findOne({ email: normalizedEmail })
+    const user = await User.findOne({ email: normalizedEmail }).select("+password")
     if (!user) {
         return res.status(401).json({ message: 'Invalid email or password' })
     }
@@ -86,6 +86,13 @@ export const login = asynchandler(async (req, res) => {
         return res.status(403).json({ message: 'Your account has been deactivated' })
     }
     
+
+    if (!user.password) {
+        return res.status(401).json({
+            success: false,
+            message: 'Invalid email or password'
+        })
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password)
     if (!isPasswordValid) {
@@ -161,7 +168,7 @@ export const refreshToken = asynchandler(async (req, res) => {
         });
     }
 
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).select("+refreshToken");
 
     if (!user) {
         return res.status(401).json({
@@ -174,6 +181,13 @@ export const refreshToken = asynchandler(async (req, res) => {
         return res.status(403).json({
             success: false,
             message: 'Account is inactive'
+        });
+    }
+
+    if (!user.refreshToken) {
+        return res.status(401).json({
+            success: false,
+            message: 'Refresh token is invalid'
         });
     }
 

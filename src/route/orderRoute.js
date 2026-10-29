@@ -22,28 +22,28 @@ const orderRoute = express.Router();
 orderRoute.post(
   "/",
   verifiveToken,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "seller"),
   createOrder
 );
 
 orderRoute.get(
   "/my",
   verifiveToken,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "seller"),
   getMyOrders
 );
 
 orderRoute.patch(
   "/:id/cancel",
   verifiveToken,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "seller"),
   cancelOrder
 );
 
 orderRoute.patch(
   "/:id/confirm-received",
   verifiveToken,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "seller"),
   confirmOrderReceived
 );
 

@@ -9,21 +9,21 @@ const WishlistRouter = express.Router();
 WishlistRouter.get(
   "/",
   verifiveToken,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "seller"),
   getWishlist
 );
 
 WishlistRouter.post(
   "/",
   verifiveToken,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "seller"),
   addToWishlist
 );
 
 WishlistRouter.delete(
   "/:productId",
   verifiveToken,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "seller"),
   removeFromWishlist
 );
 

@@ -20,6 +20,11 @@ const variantSchema = new mongoose.Schema(
       min: 0,
     },
 
+    image: {
+      type: String,
+      trim: true,
+    },
+
     stock: {
       type: Number,
       required: true,

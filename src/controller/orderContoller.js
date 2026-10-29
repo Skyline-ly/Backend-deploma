@@ -481,7 +481,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     Paid: "Packing",
     Packing: "In Transit",
     "In Transit": "Delivered",
-    // Preserve the previous pickup progression for existing orders.
+   
     Confirmed: "Processing",
     Processing: "Ready for Pickup",
     "Ready for Pickup": "Picked Up",

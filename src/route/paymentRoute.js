@@ -10,7 +10,7 @@ import { authorizeRoles } from "../middleware/catchByRole.js";
 
 const PaymentRouter = express.Router();
 
-PaymentRouter.use(verifiveToken, authorizeRoles("customer"));
+PaymentRouter.use(verifiveToken, authorizeRoles("customer", "seller"));
 
 PaymentRouter.post("/order/:orderId", createPayment);
 PaymentRouter.post("/:paymentId/verify", verifyPayment);
