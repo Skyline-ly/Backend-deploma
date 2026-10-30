@@ -4,6 +4,7 @@ import {
   createProduct,
   getMyProducts,
   getPendingProducts,
+  getAdminProducts,
   reviewProduct,
   getAllProducts,
   getProductById,
@@ -33,6 +34,12 @@ ProductRouter.get(
   verifiveToken,
   authorizeRoles("admin"),
   getPendingProducts
+);
+ProductRouter.get(
+  "/admin/all",
+  verifiveToken,
+  authorizeRoles("admin"),
+  getAdminProducts
 );
 ProductRouter.patch(
   "/:id/review",

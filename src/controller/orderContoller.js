@@ -227,6 +227,31 @@ export const getMyOrders = asyncHandler(async (req, res) => {
   });
 });
 
+export const getAdminOrders = asyncHandler(async (req, res) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+  const query = {};
+
+  if (typeof req.query.status === "string" && req.query.status) {
+    query.status = req.query.status;
+  }
+
+  const orders = await Order.paginate(query, {
+    page,
+    limit,
+    sort: { createdAt: -1 },
+    populate: [
+      { path: "customer", select: "name email" },
+      { path: "items.seller", select: "name email" },
+    ],
+  });
+
+  return res.status(200).json({
+    success: true,
+    data: orders,
+  });
+});
+
 
 export const getOrderById = asyncHandler(async (req, res) => {
   const userId = req.user.userId;

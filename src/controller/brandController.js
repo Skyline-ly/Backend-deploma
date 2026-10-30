@@ -23,16 +23,27 @@ export const createBrand= asynhandler(async(req,res)=>{
             message:"Brand already exists"
         })
     }
-    const brand=await Brand.create({
-        name:analy,
-        image: {
-            url: req.file.path,
-            publicId: req.file.filename
-        },
-        category,
-        subCategory,
-        createdBy:req.user.userId
-    })
+    let brand
+    try {
+        brand=await Brand.create({
+            name:analy,
+            image: {
+                url: req.file.path,
+                publicId: req.file.filename
+            },
+            category,
+            subCategory,
+            createdBy:req.user.userId
+        })
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message:"Brand already exists for this category and subcategory"
+            })
+        }
+        throw error
+    }
 
     return res.status(201).json({
         success: true,
@@ -137,6 +148,66 @@ export const getBrand=asynhandler(async(req,res)=>{
         }
     })
 })
+
+export const getAdminBrands=asynhandler(async(req,res)=>{
+    const {page=1,limit=20,category,subCategory,search}=req.query
+    const query={}
+
+    if(typeof search === 'string' && search.trim()){
+        query.name={$regex:search.trim(),$options:'i'}
+    }
+    if(category){
+        query.category=category
+    }
+    if(subCategory){
+        query.subCategory=subCategory
+    }
+
+    const result=await Brand.paginate(query,{
+        page,
+        limit,
+        sort:{createdAt:-1},
+        populate: [
+            { path: "category", select: "name" },
+            { path: "subCategory", select: "name" }
+        ]
+    })
+
+    return res.status(200).json({
+        success: true,
+        count: result.totalDocs,
+        data: result.docs,
+        pagination: {
+            totalDocs: result.totalDocs,
+            totalPages: result.totalPages,
+            page: result.page,
+            limit: result.limit,
+            hasNextPage: result.hasNextPage,
+            hasPrevPage: result.hasPrevPage
+        }
+    })
+})
+
+export const restoreBrand=asynhandler(async(req,res)=>{
+    const brand=await Brand.findById(req.params.id)
+
+    if(!brand){
+        return res.status(404).json({
+            success:false,
+            message:"Brand not found"
+        })
+    }
+
+    brand.isActive=true
+    await brand.save()
+
+    return res.status(200).json({
+        success:true,
+        message:"Brand restored successfully",
+        data:brand
+    })
+})
+
 export const getBrandById=asynhandler(async(req,res)=>{
     const {id}=req.params
     
@@ -177,6 +248,3 @@ export const deleteBrand=asynhandler(async (req, res) => {
             data: brand
         });
 })
-
-
-

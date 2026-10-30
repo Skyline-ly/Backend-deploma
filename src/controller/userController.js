@@ -18,6 +18,7 @@ export const userPending = asynchandler(async (req, res) => {
   ;
 
 export const searchUser = asynchandler(async (req, res) => {
+  const { search, sellerStatus, role } = req.query;
 
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(
@@ -27,14 +28,14 @@ export const searchUser = asynchandler(async (req, res) => {
 
   const query = {}
 
-  if (search) {
-    query.name = { $regex: search, $options: 'i' }
+  if (typeof search === 'string' && search.trim()) {
+    query.name = { $regex: search.trim(), $options: 'i' }
   }
-  if (sellerStatus) {
+  if (typeof sellerStatus === 'string' && sellerStatus) {
     query.sellerStatus = sellerStatus
   }
 
-  if (role) {
+  if (typeof role === 'string' && role) {
     query.role = role
   }
   const user = await User.paginate(query, { page, limit, select: '-password' })
@@ -341,4 +342,3 @@ export const becomeSeller = asynchandler(async (req, res) => {
     }
   });
 });
-

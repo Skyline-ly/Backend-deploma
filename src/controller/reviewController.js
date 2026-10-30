@@ -163,6 +163,56 @@ export const getProductReviews = asyncHandler(async (req, res) => {
   });
 });
 
+export const getAdminReviews = asyncHandler(async (req, res) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+  const [reviews, totalDocs] = await Promise.all([
+    Review.find()
+      .populate("product", "name")
+      .populate("customer", "name email")
+      .populate("order", "status")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Review.countDocuments(),
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    data: reviews,
+    pagination: {
+      totalDocs,
+      totalPages: Math.ceil(totalDocs / limit),
+      page,
+      limit,
+      hasNextPage: page * limit < totalDocs,
+      hasPrevPage: page > 1,
+    },
+  });
+});
+
+export const deleteReviewAsAdmin = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.reviewId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid review ID",
+    });
+  }
+
+  const review = await Review.findByIdAndDelete(req.params.reviewId);
+  if (!review) {
+    return res.status(404).json({
+      success: false,
+      message: "Review not found",
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Review removed successfully",
+  });
+});
+
 export const deleteMyReview = asyncHandler(async (req, res) => {
   const { reviewId } = req.params;
 

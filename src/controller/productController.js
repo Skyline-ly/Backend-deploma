@@ -286,6 +286,44 @@ export const getPendingProducts = asyncHandler(async (req, res) => {
   });
 });
 
+export const getAdminProducts = asyncHandler(async (req, res) => {
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+  const query = {};
+
+  if (typeof req.query.search === "string" && req.query.search.trim()) {
+    query.name = { $regex: req.query.search.trim(), $options: "i" };
+  }
+  if (typeof req.query.status === "string" && req.query.status) {
+    query.approvalStatus = req.query.status;
+  }
+
+  const products = await Product.paginate(query, {
+    page,
+    limit,
+    sort: { createdAt: -1 },
+    populate: [
+      { path: "seller", select: "name email" },
+      { path: "category", select: "name" },
+      { path: "subCategory", select: "name" },
+      { path: "brand", select: "name" },
+    ],
+  });
+
+  return res.status(200).json({
+    success: true,
+    data: products.docs,
+    pagination: {
+      totalDocs: products.totalDocs,
+      totalPages: products.totalPages,
+      page: products.page,
+      limit: products.limit,
+      hasNextPage: products.hasNextPage,
+      hasPrevPage: products.hasPrevPage,
+    },
+  });
+});
+
 export const reviewProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, reviewNote = "" } = req.body;

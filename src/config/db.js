@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { removeObsoleteCartIndex } from "./cartIndexMigration.js";
+import { removeObsoleteBrandNameIndex } from "./brandIndexMigration.js";
 
 export const dbConnect = async () => {
   try {
@@ -12,6 +13,7 @@ export const dbConnect = async () => {
     await mongoose.connect(mongoUrl);
 
     await removeObsoleteCartIndex();
+    await removeObsoleteBrandNameIndex();
 
     console.info("Database connected successfully");
   } catch (error) {

@@ -5,6 +5,7 @@ import {
   createOrder,
   getMyOrders,
   getOrderById,
+  getAdminOrders,
   getSellerOrders,
   getSellerSales,
   updateOrderStatus,
@@ -24,6 +25,13 @@ orderRoute.post(
   verifiveToken,
   authorizeRoles("customer", "seller"),
   createOrder
+);
+
+orderRoute.get(
+  "/admin/all",
+  verifiveToken,
+  authorizeRoles("admin"),
+  getAdminOrders
 );
 
 orderRoute.get(
