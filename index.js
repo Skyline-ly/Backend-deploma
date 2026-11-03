@@ -39,12 +39,16 @@ app.use(JSCatch)
 // app.use(cors());
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://magical-praline-869785.netlify.app",
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
 
 app.use("/api/auth",AuthRouter );
 app.use('/api/user',UserRouther)
