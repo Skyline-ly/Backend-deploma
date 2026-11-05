@@ -40,7 +40,7 @@ app.use(JSCatch)
 app.use(
   cors({
     origin: [
-      "http://localhost:5173",
+      "http://localhost:5174",
       "https://magical-praline-869785.netlify.app",
     ],
     credentials: true,

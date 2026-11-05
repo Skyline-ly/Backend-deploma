@@ -54,17 +54,18 @@ export const createCategory = asynchandler(async (req, res) => {
     });
 });
 
-export const getCategoryId=asynchandler(async(req,res)=>{
+export const getCategoryId = asynchandler(async (req, res) => {
 
-    const {id}=req.params
+    const { id } = req.params
 
-    const category=await Category.findOne({_id:id,
-        isActive:true
+    const category = await Category.findOne({
+        _id: id,
+        isActive: true
     })
-    if(!category){
+    if (!category) {
         return res.status(404).json({
             success: false,
-            message:"Category not found"
+            message: "Category not found"
         })
     }
 
@@ -75,49 +76,59 @@ export const getCategoryId=asynchandler(async(req,res)=>{
 
 })
 
-export const getAllcategory=asynchandler(async(req,res)=>{
+export const getAllcategory = asynchandler(async (req, res) => {
+    const escapeRegex = (value) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+        100,
+        Math.max(1, Number.parseInt(req.query.limit, 10) || 10)
+    );
 
-   const {page=1,limit=10,search}=req.query
+    const query = { isActive: true };
 
-    const query={isActive:true}
-
-    if(search){
-        query.name={$regex:search,$options:'i'}
+    if (typeof req.query.search === "string" && req.query.search.trim()) {
+        query.name = {
+            $regex: escapeRegex(req.query.search.trim()),
+            $options: "i",
+        };
     }
-    const category=await Category.paginate(query,{page,limit})
+
+    const categories = await Category.paginate(query, { page, limit });
 
     return res.status(200).json({
         success: true,
-        count: category.totalDocs,
-        data: category
-    })
+        data: categories,
+    });
+});
 
-})
-
-export const deleteCategory=asynchandler(async (req, res) => {
+export const deleteCategory = asynchandler(async (req, res) => {
 
     const { id } = req.params
 
-    const category = await Category.findById(id)
+    const category = await Category.findOne({
+        _id: id,
+        isActive: true,
+    });
 
     if (!category) {
-      return res.status(404).json({
-        success: false,
-        message: 'Category not found'
-      })
+        return res.status(404).json({
+            success: false,
+            message: 'Category not found'
+        })
     }
     category.isActive = false
     await category.save()
 
     return res.status(200).json({
-      success: true,
-      message: 'Category deleted successfully',
-      data: {
-        categoryId: category._id,
-        name: category.name
-      }
+        success: true,
+        message: 'Category deleted successfully',
+        data: {
+            categoryId: category._id,
+            name: category.name
+        }
     })
-  })
+})
 
 export const updateCategory = asynchandler(async (req, res) => {
     const { id } = req.params;
