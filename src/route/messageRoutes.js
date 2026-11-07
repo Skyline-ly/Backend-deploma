@@ -10,7 +10,7 @@ import { verifiveToken } from "../middleware/verifyToken.js";
 const MessageRouter = express.Router();
 
 
-// Get messages
+
 MessageRouter.get(
   "/:conversationId",
   verifiveToken,
@@ -18,7 +18,7 @@ MessageRouter.get(
 );
 
 
-// Send message
+
 MessageRouter.post(
   "/:conversationId",
   verifiveToken,

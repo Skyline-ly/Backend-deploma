@@ -65,6 +65,10 @@ app.use('/api/attribute',AttributeRouter)
 app.use('/api/wishlist',WishlistRouter)
 app.use('/api/review',ReviewRouter)
 
+app.get("/", (req, res) => {
+  res.json({ message: "Welcome to the E-commerce API" });
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
 });

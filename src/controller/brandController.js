@@ -138,7 +138,7 @@ export const getBrand=asynhandler(async(req,res)=>{
         success: true,
         count: result.totalDocs,
         data: result.docs,
-        pagination: {
+        pagination: { 
             totalDocs: result.totalDocs,
             totalPages: result.totalPages,
             page: result.page,
@@ -150,7 +150,7 @@ export const getBrand=asynhandler(async(req,res)=>{
 })
 
 export const getAdminBrands=asynhandler(async(req,res)=>{
-    const {page=1,limit=20,category,subCategory,search}=req.query
+    const {page=1,limit=20,category,search}=req.query
     const query={}
 
     if(typeof search === 'string' && search.trim()){
@@ -159,9 +159,7 @@ export const getAdminBrands=asynhandler(async(req,res)=>{
     if(category){
         query.category=category
     }
-    if(subCategory){
-        query.subCategory=subCategory
-    }
+    
 
     const result=await Brand.paginate(query,{
         page,
@@ -169,7 +167,7 @@ export const getAdminBrands=asynhandler(async(req,res)=>{
         sort:{createdAt:-1},
         populate: [
             { path: "category", select: "name" },
-            { path: "subCategory", select: "name" }
+            
         ]
     })
 

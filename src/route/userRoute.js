@@ -16,6 +16,7 @@ import {
 
 import { verifiveToken } from "../middleware/verifyToken.js";
 import { authorizeRoles } from "../middleware/catchByRole.js";
+import upload from "../middleware/multer.js";
 
 const UserRouter = express.Router();
 
@@ -84,11 +85,14 @@ UserRouter.patch(
   userProfile
 );
 
-
 UserRouter.post(
   "/become-seller",
   verifiveToken,
   authorizeRoles("customer"),
+  upload.fields([
+    { name: "avatar", maxCount: 1 },
+    { name: "idCardPhoto", maxCount: 1 },
+  ]),
   becomeSeller
 );
 

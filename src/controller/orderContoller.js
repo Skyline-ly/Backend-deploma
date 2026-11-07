@@ -6,25 +6,58 @@ import { Order } from "../model/Order.js";
 import { Cart } from "../model/cart.js";
 import { Product } from "../model/Product.js";
 import { User } from "../model/User.js";
+import { Payment } from "../model/Payment.js";
+
+async function restoreOrderStock(order, session) {
+  if (!order.stockDeducted) return;
+
+  for (const item of order.items) {
+    const product = await Product.findById(item.product).session(session);
+    if (!product) continue;
+
+    if (item.variantId) {
+      const variant = product.variants.id(item.variantId);
+      if (variant) variant.stock += item.quantity;
+    } else if (product.variants.length === 0) {
+      product.stock += item.quantity;
+    }
+    await product.save({ session });
+  }
+}
 
 
 export const createOrder = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
 
-  const { pickupInfo } = req.body;
+  const { deliveryInfo } = req.body;
 
   if (
-    !pickupInfo ||
-    !pickupInfo.location ||
-    pickupInfo.location.trim() === ""
+    !deliveryInfo ||
+    typeof deliveryInfo.address !== "string" ||
+    !deliveryInfo.address.trim() ||
+    typeof deliveryInfo.phone !== "string" ||
+    !deliveryInfo.phone.trim()
   ) {
     return res.status(400).json({
       success: false,
-      message: "Pickup location is required",
+      message: "Delivery address and phone number are required",
     });
   }
 
-  
+  if (deliveryInfo.address.trim().length > 500 || deliveryInfo.phone.trim().length > 30) {
+    return res.status(400).json({
+      success: false,
+      message: "Delivery address or phone number is too long",
+    });
+  }
+  if (deliveryInfo.note !== undefined && (
+    typeof deliveryInfo.note !== "string" || deliveryInfo.note.length > 500
+  )) {
+    return res.status(400).json({
+      success: false,
+      message: "Delivery note must be 500 characters or fewer",
+    });
+  }
 
   const session = await mongoose.startSession();
 
@@ -36,6 +69,16 @@ export const createOrder = asyncHandler(async (req, res) => {
       const cart = await Cart.findOne({
         customer: userId,
       }).session(session);
+
+      const customer = await User.findById(userId)
+        .select("name email")
+        .session(session);
+
+      if (!customer) {
+        const error = new Error("Customer account not found");
+        error.statusCode = 404;
+        throw error;
+      }
 
       if (!cart || cart.items.length === 0) {
         const error = new Error("Your cart is empty");
@@ -161,10 +204,58 @@ export const createOrder = asyncHandler(async (req, res) => {
             items: orderItems,
             subtotal,
             totalAmount: subtotal,
-            pickupInfo: {
-              location: pickupInfo.location.trim(),
-              note: pickupInfo.note?.trim() || null,
+            deliveryInfo: {
+              name: customer.name,
+              email: customer.email,
+              phone: deliveryInfo.phone.trim(),
+              address: deliveryInfo.address.trim(),
+              note: deliveryInfo.note?.trim() || null,
             },
+            paymentMethod: "COD",
+            paymentStatus: "Pending",
+            stockDeducted: true,
+            status: "Pending",
+          },
+        ],
+        { session }
+      );
+
+      for (const cartItem of cart.items) {
+        const product = await Product.findById(cartItem.product).session(session);
+        if (!product) {
+          const error = new Error("One or more products are no longer available");
+          error.statusCode = 409;
+          throw error;
+        }
+
+        if (cartItem.variantId) {
+          const variant = product.variants.id(cartItem.variantId);
+          if (!variant || variant.stock < cartItem.quantity) {
+            const error = new Error(`Insufficient stock for ${product.name}`);
+            error.statusCode = 409;
+            throw error;
+          }
+          variant.stock -= cartItem.quantity;
+        } else {
+          if (product.variants.length > 0 || product.stock < cartItem.quantity) {
+            const error = new Error(`Insufficient stock for ${product.name}`);
+            error.statusCode = 409;
+            throw error;
+          }
+          product.stock -= cartItem.quantity;
+        }
+        await product.save({ session });
+      }
+
+      await Payment.create(
+        [
+          {
+            order: order._id,
+            customer: userId,
+            amount: subtotal,
+            currency: "USD",
+            method: "COD",
+            gateway: "Cash on Delivery",
             status: "Pending",
           },
         ],
@@ -323,7 +414,7 @@ export const getSellerOrders = asyncHandler(async (req, res) => {
     },
     populate: {
       path: "customer",
-      select: "name",
+      select: "name email phone",
     },
   };
 
@@ -372,6 +463,8 @@ export const getSellerSales = asyncHandler(async (req, res) => {
   const saleStatuses = [
     "Paid",
     "Packing",
+    "Out for Delivery",
+    "Success",
     "In Transit",
     "Delivered",
     "Completed",
@@ -503,28 +596,16 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   const nextStatus = {
+    Pending: "Packing",
+    Packing: "Out for Delivery",
+    "Out for Delivery": "Success",
     Paid: "Packing",
-    Packing: "In Transit",
     "In Transit": "Delivered",
-   
+    Delivered: "Success",
     Confirmed: "Processing",
     Processing: "Ready for Pickup",
     "Ready for Pickup": "Picked Up",
   }[order.status];
-
-  if (status === "Paid") {
-    return res.status(403).json({
-      success: false,
-      message: "Only verified payment can mark an order as paid",
-    });
-  }
-
-  if (status === "Completed") {
-    return res.status(400).json({
-      success: false,
-      message: "The customer must confirm receipt to complete the order",
-    });
-  }
 
   if (status === "Cancelled") {
     if (!isAdmin) {
@@ -540,23 +621,48 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
       });
     }
 
-    const cancelledOrder = await Order.findOneAndUpdate(
-      { _id: id, status: "Pending" },
-      { $set: { status: "Cancelled", cancelledAt: new Date() } },
-      { new: true }
-    );
-    if (!cancelledOrder) {
-      return res.status(409).json({
-        success: false,
-        message: "Order status changed before it could be cancelled",
-      });
-    }
+    const session = await mongoose.startSession();
+    try {
+      let cancelledOrder;
+      await session.withTransaction(async () => {
+        cancelledOrder = await Order.findOneAndUpdate(
+          { _id: id, status: "Pending" },
+          {
+            $set: {
+              status: "Cancelled",
+              cancelledAt: new Date(),
+              stockDeducted: false,
+              paymentStatus: "Cancelled",
+            },
+          },
+          { new: true, session }
+        );
+        if (!cancelledOrder) {
+          const error = new Error("Order status changed before it could be cancelled");
+          error.statusCode = 409;
+          throw error;
+        }
 
-    return res.status(200).json({
-      success: true,
-      message: "Order cancelled successfully",
-      data: cancelledOrder,
-    });
+        await restoreOrderStock(order, session);
+        await Payment.updateMany(
+          { order: id, method: "COD", status: "Pending" },
+          { $set: { status: "Cancelled" } },
+          { session }
+        );
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Order cancelled successfully",
+        data: cancelledOrder,
+      });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Failed to cancel order",
+      });
+    } finally {
+      await session.endSession();
+    }
   }
 
   if (!["seller", "admin"].includes(userRole)) {
@@ -573,58 +679,87 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  order.status = status;
+  if (status === "Success") {
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const updatedOrder = await Order.findOneAndUpdate(
+          { _id: id, status: { $in: ["Out for Delivery", "Delivered"] } },
+          {
+            $set: {
+              status: "Success",
+              paymentStatus: "Paid",
+              completedAt: new Date(),
+            },
+          },
+          { new: true, session, runValidators: true }
+        );
 
-  await order.save();
+        if (!updatedOrder) {
+          const error = new Error("Order status changed before completion");
+          error.statusCode = 409;
+          throw error;
+        }
+
+        const payment = await Payment.findOneAndUpdate(
+          { order: id, method: "COD", status: "Pending" },
+          { $set: { status: "Paid", paidAt: new Date() } },
+          { new: true, session }
+        );
+
+        if (!payment && updatedOrder.paymentMethod === "COD") {
+          await Payment.create(
+            [
+              {
+                order: updatedOrder._id,
+                customer: updatedOrder.customer,
+                amount: updatedOrder.totalAmount,
+                currency: "USD",
+                method: "COD",
+                gateway: "Cash on Delivery",
+                status: "Paid",
+                paidAt: new Date(),
+              },
+            ],
+            { session }
+          );
+        }
+      });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Failed to complete order",
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    const completedOrder = await Order.findById(id);
+    return res.status(200).json({
+      success: true,
+      message: "Order completed and cash-on-delivery payment recorded",
+      data: completedOrder,
+    });
+  }
+
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: id, status: order.status },
+    { $set: { status } },
+    { new: true, runValidators: true }
+  );
+  if (!updatedOrder) {
+    return res.status(409).json({
+      success: false,
+      message: "Order status changed before it could be updated",
+    });
+  }
 
   return res.status(200).json({
     success: true,
     message: "Order status updated successfully",
-    data: order,
+    data: updatedOrder,
   });
 });
-
-export const confirmOrderReceived = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid order ID",
-    });
-  }
-
-  const order = await Order.findOne({
-    _id: id,
-    customer: req.user.userId,
-  });
-
-  if (!order) {
-    return res.status(404).json({
-      success: false,
-      message: "Order not found",
-    });
-  }
-
-  if (order.status !== "Delivered") {
-    return res.status(400).json({
-      success: false,
-      message: "You can confirm receipt after the order is marked as delivered",
-    });
-  }
-
-  order.status = "Completed";
-  order.completedAt = new Date();
-  await order.save();
-
-  return res.status(200).json({
-    success: true,
-    message: "Order receipt confirmed",
-    data: order,
-  });
-});
-
-
 
 export const cancelOrder = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
@@ -638,46 +773,69 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     });
   }
 
-  const order = await Order.findOne({
-    _id: id,
-    customer: userId,
-  });
+  const session = await mongoose.startSession();
 
-  if (!order) {
-    return res.status(404).json({
-      success: false,
-      message: "Order not found",
+  try {
+    let cancelledOrder;
+    await session.withTransaction(async () => {
+      const order = await Order.findOne({
+        _id: id,
+        customer: userId,
+      }).session(session);
+
+      if (!order) {
+        const error = new Error("Order not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (order.status !== "Pending") {
+        const error = new Error("Only pending orders can be cancelled");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      cancelledOrder = await Order.findOneAndUpdate(
+        { _id: id, customer: userId, status: "Pending" },
+        {
+          $set: {
+            status: "Cancelled",
+            cancelledAt: new Date(),
+            stockDeducted: false,
+            paymentStatus: "Cancelled",
+            cancellationReason:
+              typeof cancellationReason === "string"
+                ? cancellationReason.trim() || null
+                : null,
+          },
+        },
+        { new: true, session }
+      );
+      if (!cancelledOrder) {
+        const error = new Error("Order status changed before it could be cancelled");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      await restoreOrderStock(order, session);
+      await Payment.updateMany(
+        { order: id, method: "COD", status: "Pending" },
+        { $set: { status: "Cancelled" } },
+        { session }
+      );
     });
-  }
 
-  if (order.status !== "Pending") {
-    return res.status(400).json({
-      success: false,
-      message: "Only pending orders can be cancelled",
+    return res.status(200).json({
+      success: true,
+      message: "Order cancelled successfully",
+      data: cancelledOrder,
     });
-  }
-
-  const cancelledOrder = await Order.findOneAndUpdate(
-    { _id: id, customer: userId, status: "Pending" },
-    {
-      $set: {
-        status: "Cancelled",
-        cancelledAt: new Date(),
-        cancellationReason: cancellationReason?.trim() || null,
-      },
-    },
-    { new: true }
-  );
-  if (!cancelledOrder) {
-    return res.status(409).json({
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Order status changed before it could be cancelled",
+      message: error.message || "Failed to cancel order",
     });
+  } finally {
+    await session.endSession();
   }
-
-  return res.status(200).json({
-    success: true,
-    message: "Order cancelled successfully",
-    data: cancelledOrder,
-  });
 });

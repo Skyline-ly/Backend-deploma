@@ -88,18 +88,18 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
 
-    pickupInfo: {
-      location: {
-        type: String,
-        required: true,
-        trim: true,
-      },
+    deliveryInfo: {
+      name: { type: String, trim: true, default: "" },
+      email: { type: String, trim: true, lowercase: true, default: "" },
+      phone: { type: String, trim: true },
+      address: { type: String, trim: true },
+      note: { type: String, trim: true, default: null },
+    },
 
-      note: {
-        type: String,
-        trim: true,
-        default: null,
-      },
+    // Kept for previously placed pickup orders.
+    pickupInfo: {
+      location: { type: String, trim: true },
+      note: { type: String, trim: true, default: null },
     },
 
     totalAmount: {
@@ -108,15 +108,35 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
 
+    paymentMethod: {
+      type: String,
+      enum: ["COD", "KHQR"],
+      default: "COD",
+    },
+
+    paymentStatus: {
+      type: String,
+      enum: ["Pending", "Paid", "Failed", "Refunded", "Cancelled"],
+      default: "Pending",
+      index: true,
+    },
+
+    stockDeducted: {
+      type: Boolean,
+      default: false,
+    },
+
     status: {
       type: String,
       enum: [
         "Pending",
         "Paid",
         "Packing",
+        "Out for Delivery",
+        "Success",
+        // Keep existing values readable for orders created before delivery tracking.
         "In Transit",
         "Delivered",
-        // Keep existing values readable for orders created before delivery tracking.
         "Confirmed",
         "Processing",
         "Ready for Pickup",

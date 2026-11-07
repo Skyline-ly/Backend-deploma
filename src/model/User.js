@@ -54,6 +54,32 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    sellerApplication: {
+  shopName: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+  },
+
+  shopLocation: {
+    type: String,
+    trim: true,
+  },
+
+  cardId: {
+    type: String,
+    trim: true,
+  },
+
+  idCardPhoto: {
+    url: String,
+    publicId: String,
+  },
+
+  submittedAt: {
+    type: Date,
+  },
+},
 
     isActive: {
       type: Boolean,

@@ -51,7 +51,7 @@ export const createReview = asyncHandler(async (req, res) => {
   const order = await Order.findOne({
     _id: orderId,
     customer: customerId,
-    status: "Completed",
+    status: { $in: ["Success", "Completed"] },
     "items.product": productId,
   });
 

@@ -4,34 +4,58 @@ import mongoose from "mongoose";
 import { Conversation } from "../model/Conversation.js";
 import { Message } from "../model/Message.js";
 
+// Helper: validate MongoDB ObjectId
+const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+// Helper: safely get ID
+const getId = (value) => value?._id?.toString() || value?.toString();
 
 
+// ========================================
+// SEND MESSAGE
+// ========================================
 
 export const sendMessage = asyncHandler(
   async (req, res) => {
     const userId = req.user.userId;
     const { conversationId } = req.params;
-    const { text } = req.body;
+    const { text, product } = req.body;
 
-   
-    if (!text || text.trim() === "") {
+    // Validate conversation ID
+    if (!isValidId(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid conversation ID",
+      });
+    }
+
+    // Validate message text
+    if (typeof text !== "string" || !text.trim()) {
       return res.status(400).json({
         success: false,
         message: "Message cannot be empty",
       });
     }
 
-    
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    if (text.trim().length > 5000) {
       return res.status(400).json({
         success: false,
-        message: "Invalid conversation ID",
+        message: "Message cannot exceed 5000 characters",
       });
     }
 
+    // Validate optional product ID
+    if (product && !isValidId(product)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product ID",
+      });
+    }
 
-    const conversation =
-      await Conversation.findById(conversationId);
+    // Find conversation
+    const conversation = await Conversation.findById(
+      conversationId
+    );
 
     if (!conversation) {
       return res.status(404).json({
@@ -40,14 +64,12 @@ export const sendMessage = asyncHandler(
       });
     }
 
-    
+    // Verify participants
     const isCustomer =
-      conversation.customer.toString() ===
-      userId.toString();
+      getId(conversation.customer) === userId.toString();
 
     const isSeller =
-      conversation.seller.toString() ===
-      userId.toString();
+      getId(conversation.seller) === userId.toString();
 
     if (!isCustomer && !isSeller) {
       return res.status(403).json({
@@ -56,55 +78,69 @@ export const sendMessage = asyncHandler(
       });
     }
 
-    
+    // Automatically determine receiver
     const receiver = isCustomer
       ? conversation.seller
       : conversation.customer;
 
-  
-    const message = await Message.create({
+    // Prepare message data
+    const messageData = {
       conversation: conversation._id,
       sender: userId,
       receiver,
       text: text.trim(),
-    });
+    };
 
-    
+    // Attach product if provided
+    if (product) {
+      messageData.product = product;
+    }
+
+    // Create message
+    const message = await Message.create(messageData);
+
+    // Update conversation's last message
     conversation.lastMessage = text.trim();
     conversation.lastMessageAt = new Date();
 
     await conversation.save();
 
-  
-    const populatedMessage =
-      await Message.findById(message._id)
-        .populate("sender", "name email")
-        .populate("receiver", "name email");
+    // Populate message information
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "name email")
+      .populate("receiver", "name email")
+      .populate("product");
 
     return res.status(201).json({
       success: true,
+      message: "Message sent successfully",
       data: populatedMessage,
     });
   }
 );
 
 
-
+// ========================================
+// GET MESSAGES
+// ========================================
 
 export const getMessages = asyncHandler(
   async (req, res) => {
     const userId = req.user.userId;
     const { conversationId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    // Validate conversation ID
+    if (!isValidId(conversationId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid conversation ID",
       });
     }
 
-    const conversation =
-      await Conversation.findById(conversationId);
+    // Find conversation
+    const conversation = await Conversation.findById(
+      conversationId
+    );
 
     if (!conversation) {
       return res.status(404).json({
@@ -113,14 +149,12 @@ export const getMessages = asyncHandler(
       });
     }
 
-  
+    // Verify participants
     const isCustomer =
-      conversation.customer.toString() ===
-      userId.toString();
+      getId(conversation.customer) === userId.toString();
 
     const isSeller =
-      conversation.seller.toString() ===
-      userId.toString();
+      getId(conversation.seller) === userId.toString();
 
     if (!isCustomer && !isSeller) {
       return res.status(403).json({
@@ -129,12 +163,13 @@ export const getMessages = asyncHandler(
       });
     }
 
-  
+    // Get conversation messages
     const messages = await Message.find({
       conversation: conversationId,
     })
       .populate("sender", "name email")
       .populate("receiver", "name email")
+      .populate("product")
       .sort({ createdAt: 1 });
 
     return res.status(200).json({
@@ -145,15 +180,27 @@ export const getMessages = asyncHandler(
 );
 
 
-
+// ========================================
+// MARK MESSAGES AS READ
+// ========================================
 
 export const markMessagesAsRead = asyncHandler(
   async (req, res) => {
     const userId = req.user.userId;
     const { conversationId } = req.params;
 
-    const conversation =
-      await Conversation.findById(conversationId);
+    // Validate conversation ID
+    if (!isValidId(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid conversation ID",
+      });
+    }
+
+    // Find conversation
+    const conversation = await Conversation.findById(
+      conversationId
+    );
 
     if (!conversation) {
       return res.status(404).json({
@@ -162,13 +209,12 @@ export const markMessagesAsRead = asyncHandler(
       });
     }
 
+    // Verify participants
     const isCustomer =
-      conversation.customer.toString() ===
-      userId.toString();
+      getId(conversation.customer) === userId.toString();
 
     const isSeller =
-      conversation.seller.toString() ===
-      userId.toString();
+      getId(conversation.seller) === userId.toString();
 
     if (!isCustomer && !isSeller) {
       return res.status(403).json({
@@ -177,7 +223,8 @@ export const markMessagesAsRead = asyncHandler(
       });
     }
 
-    await Message.updateMany(
+    // Only mark messages received by the current user
+    const result = await Message.updateMany(
       {
         conversation: conversationId,
         receiver: userId,
@@ -193,6 +240,7 @@ export const markMessagesAsRead = asyncHandler(
     return res.status(200).json({
       success: true,
       message: "Messages marked as read",
+      modifiedCount: result.modifiedCount,
     });
   }
 );

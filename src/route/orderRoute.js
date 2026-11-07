@@ -10,7 +10,6 @@ import {
   getSellerSales,
   updateOrderStatus,
   cancelOrder,
-  confirmOrderReceived,
 } from "../controller/orderContoller.js";
 import { verifiveToken } from "../middleware/verifyToken.js";
 import { authorizeRoles } from "../middleware/catchByRole.js";
@@ -47,14 +46,6 @@ orderRoute.patch(
   authorizeRoles("customer", "seller"),
   cancelOrder
 );
-
-orderRoute.patch(
-  "/:id/confirm-received",
-  verifiveToken,
-  authorizeRoles("customer", "seller"),
-  confirmOrderReceived
-);
-
 
 orderRoute.get(
   "/seller/sales",

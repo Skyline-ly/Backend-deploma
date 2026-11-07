@@ -32,7 +32,7 @@ const paymentSchema = new mongoose.Schema(
 
     method: {
       type: String,
-      enum: ["KHQR"],
+      enum: ["COD", "KHQR"],
       default: "KHQR",
       required: true,
     },
@@ -68,6 +68,7 @@ const paymentSchema = new mongoose.Schema(
         "Failed",
         "Expired",
         "Refunded",
+        "Cancelled",
       ],
       default: "Pending",
       index: true,

@@ -1,45 +1,75 @@
-import asynchandler from 'express-async-handler'
-import { Category } from '../model/Category.js'
+
+import asyncHandler from "express-async-handler";
+import { Category } from "../model/Category.js";
 
 
-export const createCategory = asynchandler(async (req, res) => {
+const escapeRegex = (value) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const getPaginationOptions = (req) => {
+    const page = Math.max(
+        1,
+        Number.parseInt(req.query.page, 10) || 1
+    );
 
+    const limit = Math.min(
+        100,
+        Math.max(1, Number.parseInt(req.query.limit, 10) || 10)
+    );
+
+    return { page, limit };
+};
+
+const getSearchQuery = (search) => {
+    if (typeof search !== "string" || !search.trim()) {
+        return {};
+    }
+
+    return {
+        name: {
+            $regex: escapeRegex(search.trim()),
+            $options: "i",
+        },
+    };
+};
+
+
+export const createCategory = asyncHandler(async (req, res) => {
     const { name } = req.body;
 
     if (typeof name !== "string" || !name.trim()) {
         return res.status(400).json({
             success: false,
-            message: "Category name is required"
+            message: "Category name is required",
         });
     }
 
     if (!req.file?.path) {
         return res.status(400).json({
             success: false,
-            message: "Category image is required"
+            message: "Category image is required",
         });
     }
 
-    const analy = name.trim().toLowerCase();
+    const normalizedName = name.trim().toLowerCase();
 
-    const isCategoryNameExist = await Category.findOne({
-        name: analy
+    const existingCategory = await Category.findOne({
+        name: normalizedName,
     });
 
-    if (isCategoryNameExist) {
+    if (existingCategory) {
         return res.status(409).json({
             success: false,
-            message: "Category already exists"
+            message: "Category already exists",
         });
     }
 
     const category = await Category.create({
-        name: analy,
+        name: normalizedName,
         image: {
             url: req.file.path,
-            publicId: req.file.filename
+            publicId: req.file.filename,
         },
-        createdBy: req.user.userId
+        createdBy: req.user.userId,
     });
 
     return res.status(201).json({
@@ -48,63 +78,74 @@ export const createCategory = asynchandler(async (req, res) => {
         data: {
             categoryId: category._id,
             name: category.name,
-            categoryImage: category.image,
-            createdBy: category.createdBy
-        }
+            image: category.image,
+            createdBy: category.createdBy,
+        },
     });
 });
 
-export const getCategoryId = asynchandler(async (req, res) => {
 
-    const { id } = req.params
+export const getCategory = asyncHandler(async (req, res) => {
+    const { page, limit } = getPaginationOptions(req);
 
-    const category = await Category.findOne({
-        _id: id,
-        isActive: true
-    })
-    if (!category) {
-        return res.status(404).json({
-            success: false,
-            message: "Category not found"
-        })
-    }
+    const query = {
+        isActive: true,
+        ...getSearchQuery(req.query.search),
+    };
 
-    return res.status(200).json({
-        success: true,
-        data: category
-    })
-
-})
-
-export const getAllcategory = asynchandler(async (req, res) => {
-    const escapeRegex = (value) =>
-    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(
-        100,
-        Math.max(1, Number.parseInt(req.query.limit, 10) || 10)
-    );
-
-    const query = { isActive: true };
-
-    if (typeof req.query.search === "string" && req.query.search.trim()) {
-        query.name = {
-            $regex: escapeRegex(req.query.search.trim()),
-            $options: "i",
-        };
-    }
-
-    const categories = await Category.paginate(query, { page, limit });
+    const categories = await Category.paginate(query, {
+        page,
+        limit,
+        sort: { createdAt: -1 },
+    });
 
     return res.status(200).json({
         success: true,
-        data: categories,
+        count: categories.totalDocs,
+        data: categories.docs,
+        pagination: {
+            totalDocs: categories.totalDocs,
+            totalPages: categories.totalPages,
+            page: categories.page,
+            limit: categories.limit,
+            hasNextPage: categories.hasNextPage,
+            hasPrevPage: categories.hasPrevPage,
+        },
     });
 });
 
-export const deleteCategory = asynchandler(async (req, res) => {
 
-    const { id } = req.params
+export const getAdminCategories = asyncHandler(async (req, res) => {
+    const { page, limit } = getPaginationOptions(req);
+
+    const query = {
+        ...getSearchQuery(req.query.search),
+    };
+
+    const categories = await Category.paginate(query, {
+        page,
+        limit,
+        sort: { createdAt: -1 },
+    });
+
+    return res.status(200).json({
+        success: true,
+        count: categories.totalDocs,
+        data: categories.docs,
+        pagination: {
+            totalDocs: categories.totalDocs,
+            totalPages: categories.totalPages,
+            page: categories.page,
+            limit: categories.limit,
+            hasNextPage: categories.hasNextPage,
+            hasPrevPage: categories.hasPrevPage,
+        },
+    });
+});
+
+
+export const getCategoryById = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
     const category = await Category.findOne({
         _id: id,
@@ -114,30 +155,25 @@ export const deleteCategory = asynchandler(async (req, res) => {
     if (!category) {
         return res.status(404).json({
             success: false,
-            message: 'Category not found'
-        })
+            message: "Category not found",
+        });
     }
-    category.isActive = false
-    await category.save()
 
     return res.status(200).json({
         success: true,
-        message: 'Category deleted successfully',
-        data: {
-            categoryId: category._id,
-            name: category.name
-        }
-    })
-})
+        data: category,
+    });
+});
 
-export const updateCategory = asynchandler(async (req, res) => {
+
+export const updateCategory = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
 
     if (req.body.image !== undefined) {
         return res.status(400).json({
             success: false,
-            message: "Upload the image as a file using the image field"
+            message: "Upload the image as a file using the image field",
         });
     }
 
@@ -146,7 +182,7 @@ export const updateCategory = asynchandler(async (req, res) => {
     if (!category) {
         return res.status(404).json({
             success: false,
-            message: "Category not found"
+            message: "Category not found",
         });
     }
 
@@ -154,21 +190,21 @@ export const updateCategory = asynchandler(async (req, res) => {
         if (typeof name !== "string" || !name.trim()) {
             return res.status(400).json({
                 success: false,
-                message: "Category name cannot be empty"
+                message: "Category name cannot be empty",
             });
         }
 
         const normalizedName = name.trim().toLowerCase();
 
-        const exists = await Category.findOne({
+        const existingCategory = await Category.findOne({
             name: normalizedName,
-            _id: { $ne: id }
+            _id: { $ne: id },
         });
 
-        if (exists) {
+        if (existingCategory) {
             return res.status(409).json({
                 success: false,
-                message: "Category name already exists"
+                message: "Category name already exists",
             });
         }
 
@@ -178,7 +214,7 @@ export const updateCategory = asynchandler(async (req, res) => {
     if (req.file?.path) {
         category.image = {
             url: req.file.path,
-            publicId: req.file.filename
+            publicId: req.file.filename,
         };
     }
 
@@ -187,7 +223,65 @@ export const updateCategory = asynchandler(async (req, res) => {
     return res.status(200).json({
         success: true,
         message: "Category updated successfully",
-        data: category
+        data: category,
     });
 });
 
+
+export const deleteCategory = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const category = await Category.findOne({
+        _id: id,
+        isActive: true,
+    });
+
+    if (!category) {
+        return res.status(404).json({
+            success: false,
+            message: "Category not found",
+        });
+    }
+
+    category.isActive = false;
+    await category.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "Category deleted successfully",
+        data: {
+            categoryId: category._id,
+            name: category.name,
+        },
+    });
+});
+
+
+export const restoreCategory = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    const category = await Category.findById(id);
+
+    if (!category) {
+        return res.status(404).json({
+            success: false,
+            message: "Category not found",
+        });
+    }
+
+    if (category.isActive) {
+        return res.status(400).json({
+            success: false,
+            message: "Category is already active",
+        });
+    }
+
+    category.isActive = true;
+    await category.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "Category restored successfully",
+        data: category,
+    });
+});

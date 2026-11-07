@@ -297,48 +297,111 @@ export const suspendUser = asynchandler(async (req, res) => {
 }
 );
 
-
 export const becomeSeller = asynchandler(async (req, res) => {
   const user = await User.findById(req.user.userId);
 
   if (!user) {
     return res.status(404).json({
       success: false,
-      message: 'User not found'
+      message: "User not found",
     });
   }
 
   if (!user.isActive) {
     return res.status(403).json({
       success: false,
-      message: 'Your account is inactive'
+      message: "Your account is inactive",
     });
   }
 
-  if (user.role === 'seller') {
+  if (user.role === "seller") {
     return res.status(400).json({
       success: false,
-      message: 'You are already a seller'
+      message: "You are already a seller",
     });
   }
 
-  if (user.sellerStatus === 'pending') {
+  if (user.sellerStatus === "pending") {
     return res.status(400).json({
       success: false,
-      message: 'Your seller application is already pending'
+      message: "Your seller application is already pending",
     });
   }
 
-  user.sellerStatus = 'pending';
+  if (user.sellerStatus === "approved") {
+    return res.status(400).json({
+      success: false,
+      message: "Your seller application is already approved",
+    });
+  }
+
+  const {
+    shopName,
+    shopLocation,
+    phone,
+    cardId,
+  } = req.body;
+
+  if (
+    [shopName, shopLocation, phone, cardId].some(
+      (value) => typeof value !== "string" || !value.trim()
+    )
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Please fill in all required information",
+    });
+  }
+
+  const avatarFile = req.files?.avatar?.[0];
+  const idCardFile = req.files?.idCardPhoto?.[0];
+
+  if (!avatarFile || !idCardFile) {
+    return res.status(400).json({
+      success: false,
+      message: "Profile photo and identity card photo are required",
+    });
+  }
+
+  user.phone = phone.trim();
+
+  user.avatar = {
+    url: avatarFile.path,
+    publicId: avatarFile.filename,
+  };
+
+  user.sellerApplication = {
+    shopName: shopName.trim(),
+    shopLocation: shopLocation.trim(),
+    cardId: cardId.trim(),
+
+    idCardPhoto: {
+      url: idCardFile.path,
+      publicId: idCardFile.filename,
+    },
+
+    submittedAt: new Date(),
+  };
+
+  user.sellerStatus = "pending";
+
   await user.save();
 
   return res.status(200).json({
     success: true,
-    message: 'Seller application submitted successfully.',
+    message: "Seller application submitted successfully",
     data: {
       id: user._id,
+      name: user.name,
+      phone: user.phone,
+      avatar: user.avatar,
       role: user.role,
-      sellerStatus: user.sellerStatus
-    }
+      sellerStatus: user.sellerStatus,
+      sellerApplication: {
+        shopName: user.sellerApplication.shopName,
+        shopLocation: user.sellerApplication.shopLocation,
+        submittedAt: user.sellerApplication.submittedAt,
+      },
+    },
   });
 });
