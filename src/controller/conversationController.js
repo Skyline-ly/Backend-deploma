@@ -80,8 +80,8 @@ export const getOrCreateConversation = asyncHandler(
 
     // Populate conversation details
     conversation = await Conversation.findById(conversation._id)
-      .populate("customer", "name email")
-      .populate("seller", "name email");
+      .populate("customer", "name avatar")
+      .populate("seller", "name avatar sellerApplication.shopName");
 
     return res.status(200).json({
       success: true,
@@ -103,8 +103,8 @@ export const getMyConversations = asyncHandler(
         { seller: userId },
       ],
     })
-      .populate("customer", "name email")
-      .populate("seller", "name email")
+      .populate("customer", "name avatar")
+      .populate("seller", "name avatar sellerApplication.shopName")
       .sort({
         lastMessageAt: -1,
         updatedAt: -1,
@@ -134,8 +134,8 @@ export const getConversationById = asyncHandler(
     }
 
     const conversation = await Conversation.findById(conversationId)
-      .populate("customer", "name email")
-      .populate("seller", "name email");
+      .populate("customer", "name avatar")
+      .populate("seller", "name avatar sellerApplication.shopName");
 
     if (!conversation) {
       return res.status(404).json({

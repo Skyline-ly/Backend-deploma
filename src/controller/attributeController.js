@@ -1,11 +1,48 @@
-
 import asyncHandler from "express-async-handler";
 import mongoose from "mongoose";
 
 import { Attribute } from "../model/Attribute.js";
 import { Subcategory } from "../model/Subcategory.js";
 
+const ALLOWED_INPUT_TYPES = [
+  "text",
+  "number",
+  "select",
+  "multiselect",
+  "boolean",
+];
 
+function validateOptions(options, inputType) {
+  if (!Array.isArray(options)) {
+    return { error: "Options must be an array" };
+  }
+
+  if (options.some((option) => typeof option !== "string")) {
+    return { error: "Every option must be a string" };
+  }
+
+  const cleanedOptions = [
+    ...new Set(options.map((option) => option.trim()).filter(Boolean)),
+  ];
+
+  if (
+    ["select", "multiselect"].includes(inputType) &&
+    cleanedOptions.length === 0
+  ) {
+    return {
+      error: "Select and multiselect attributes require at least one option",
+    };
+  }
+
+  return { options: cleanedOptions };
+}
+
+function validKey(key) {
+  return (
+    typeof key === "string" &&
+    /^[a-z][a-z0-9_]*$/.test(key.trim().toLowerCase())
+  );
+}
 
 export const createAttribute = asyncHandler(async (req, res) => {
   const {
@@ -19,10 +56,15 @@ export const createAttribute = asyncHandler(async (req, res) => {
     isVariant = false,
   } = req.body;
 
-  if (!name?.trim() || !key?.trim() || !subCategory) {
+  if (
+    typeof name !== "string" ||
+    !name.trim() ||
+    !validKey(key) ||
+    !subCategory
+  ) {
     return res.status(400).json({
       success: false,
-      message: "Name, key and subcategory are required",
+      message: "Valid name, key and subcategory are required",
     });
   }
 
@@ -33,39 +75,31 @@ export const createAttribute = asyncHandler(async (req, res) => {
     });
   }
 
-  const allowedInputTypes = [
-    "text",
-    "number",
-    "select",
-    "multiselect",
-    "boolean",
-  ];
-
-  if (!allowedInputTypes.includes(inputType)) {
+  if (!ALLOWED_INPUT_TYPES.includes(inputType)) {
     return res.status(400).json({
       success: false,
       message: "Invalid attribute input type",
     });
   }
 
-  if (!Array.isArray(options)) {
+  for (const value of [isRequired, isFilterable, isVariant]) {
+    if (typeof value !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "Attribute settings must be true or false",
+      });
+    }
+  }
+
+  const optionResult = validateOptions(options, inputType);
+
+  if (optionResult.error) {
     return res.status(400).json({
       success: false,
-      message: "Options must be an array",
+      message: optionResult.error,
     });
   }
 
-  if (
-    ["select", "multiselect"].includes(inputType) &&
-    options.filter((option) => typeof option === "string" && option.trim()).length === 0
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Select and multiselect attributes require options",
-    });
-  }
-
-  
   const subcategory = await Subcategory.findOne({
     _id: subCategory,
     isActive: true,
@@ -80,66 +114,60 @@ export const createAttribute = asyncHandler(async (req, res) => {
 
   const normalizedKey = key.trim().toLowerCase();
 
-  
-  if (!/^[a-z][a-z0-9_]*$/.test(normalizedKey)) {
-    return res.status(400).json({
-      success: false,
-      message:
-        "Key must start with a letter and contain only lowercase letters, numbers or underscores",
-    });
-  }
-
-
-  const existingAttribute = await Attribute.findOne({
+  const existing = await Attribute.findOne({
     subCategory,
     key: normalizedKey,
   });
 
-  if (existingAttribute) {
+  if (existing) {
     return res.status(409).json({
       success: false,
       message: "This attribute key already exists in this subcategory",
     });
   }
 
-  const attribute = await Attribute.create({
-    name: name.trim(),
-    key: normalizedKey,
-    subCategory,
-    inputType,
-    options: options.map((option) => option.trim()).filter(Boolean),
-    isRequired,
-    isFilterable,
-    isVariant,
-    createdBy: req.user.userId,
-  });
+  try {
+    const attribute = await Attribute.create({
+      name: name.trim(),
+      key: normalizedKey,
+      subCategory,
+      inputType,
+      options: optionResult.options,
+      isRequired,
+      isFilterable,
+      isVariant,
+      createdBy: req.user.userId,
+    });
 
-  return res.status(201).json({
-    success: true,
-    message: "Attribute created successfully",
-    data: attribute,
-  });
+    return res.status(201).json({
+      success: true,
+      message: "Attribute created successfully",
+      data: attribute,
+    });
+  } catch (error) {
+    // Also handles duplicate-key races from the unique database index.
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "This attribute key already exists in this subcategory",
+      });
+    }
+
+    throw error;
+  }
 });
 
-
-
 export const getAllAttributes = asyncHandler(async (req, res) => {
-  const {
-    page = 1,
-    limit = 10,
-    subCategory,
-    isActive,
-  } = req.query;
-
-  const pageNumber = Number(page);
-  const limitNumber = Number(limit);
+  const page = Number(req.query.page ?? 1);
+  const limit = Number(req.query.limit ?? 10);
+  const { subCategory, isActive } = req.query;
 
   if (
-    !Number.isInteger(pageNumber) ||
-    !Number.isInteger(limitNumber) ||
-    pageNumber < 1 ||
-    limitNumber < 1 ||
-    limitNumber > 100
+    !Number.isSafeInteger(page) ||
+    !Number.isSafeInteger(limit) ||
+    page < 1 ||
+    limit < 1 ||
+    limit > 100
   ) {
     return res.status(400).json({
       success: false,
@@ -171,7 +199,7 @@ export const getAllAttributes = asyncHandler(async (req, res) => {
     query.isActive = isActive === "true";
   }
 
-  const skip = (pageNumber - 1) * limitNumber;
+  const skip = (page - 1) * limit;
 
   const [attributes, totalDocs] = await Promise.all([
     Attribute.find(query)
@@ -179,7 +207,7 @@ export const getAllAttributes = asyncHandler(async (req, res) => {
       .populate("createdBy", "name")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limitNumber),
+      .limit(limit),
 
     Attribute.countDocuments(query),
   ]);
@@ -189,15 +217,52 @@ export const getAllAttributes = asyncHandler(async (req, res) => {
     data: attributes,
     pagination: {
       totalDocs,
-      totalPages: Math.ceil(totalDocs / limitNumber),
-      page: pageNumber,
-      limit: limitNumber,
+      totalPages: Math.ceil(totalDocs / limit),
+      page,
+      limit,
       hasNextPage: skip + attributes.length < totalDocs,
-      hasPrevPage: pageNumber > 1,
+      hasPrevPage: page > 1,
     },
   });
 });
 
+export const getSellerAttributes = asyncHandler(async (req, res) => {
+  const { subCategory } = req.query;
+
+  if (
+    typeof subCategory !== "string" ||
+    !mongoose.Types.ObjectId.isValid(subCategory)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "A valid subcategory ID is required",
+    });
+  }
+
+  const subcategory = await Subcategory.findOne({
+    _id: subCategory,
+    isActive: true,
+  }).select("_id");
+
+  if (!subcategory) {
+    return res.status(404).json({
+      success: false,
+      message: "Active subcategory not found",
+    });
+  }
+
+  const attributes = await Attribute.find({
+    subCategory,
+    isActive: true,
+  })
+    .select("name key inputType options isRequired isVariant")
+    .sort({ name: 1 });
+
+  return res.status(200).json({
+    success: true,
+    data: attributes,
+  });
+});
 
 export const getAttributeById = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -226,20 +291,8 @@ export const getAttributeById = asyncHandler(async (req, res) => {
   });
 });
 
-
 export const updateAttribute = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
-  const {
-    name,
-    key,
-    subCategory,
-    inputType,
-    options,
-    isRequired,
-    isFilterable,
-    isVariant,
-  } = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({
@@ -257,67 +310,75 @@ export const updateAttribute = asyncHandler(async (req, res) => {
     });
   }
 
-  const newSubCategory = subCategory ?? attribute.subCategory;
-  const newKey =
-    key !== undefined ? key.trim().toLowerCase() : attribute.key;
-  const newInputType = inputType ?? attribute.inputType;
-  const newOptions = options ?? attribute.options;
+  const {
+    name,
+    key,
+    subCategory,
+    inputType,
+    options,
+    isRequired,
+    isFilterable,
+    isVariant,
+  } = req.body;
 
-  if (name !== undefined && !name.trim()) {
+  const nextName = name === undefined ? attribute.name : name;
+  const nextKey =
+    key === undefined ? attribute.key : key;
+  const nextSubCategory =
+    subCategory === undefined
+      ? attribute.subCategory.toString()
+      : subCategory;
+  const nextInputType = inputType ?? attribute.inputType;
+  const nextOptions = options ?? attribute.options;
+
+  if (typeof nextName !== "string" || !nextName.trim()) {
     return res.status(400).json({
       success: false,
       message: "Attribute name cannot be empty",
     });
   }
 
-  if (!mongoose.Types.ObjectId.isValid(newSubCategory)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid subcategory ID",
-    });
-  }
-
-  const allowedInputTypes = [
-    "text",
-    "number",
-    "select",
-    "multiselect",
-    "boolean",
-  ];
-
-  if (!allowedInputTypes.includes(newInputType)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid attribute input type",
-    });
-  }
-
-  if (!/^[a-z][a-z0-9_]*$/.test(newKey)) {
+  if (!validKey(nextKey)) {
     return res.status(400).json({
       success: false,
       message: "Invalid attribute key",
     });
   }
 
-  if (!Array.isArray(newOptions)) {
+  if (!mongoose.Types.ObjectId.isValid(nextSubCategory)) {
     return res.status(400).json({
       success: false,
-      message: "Options must be an array",
+      message: "Invalid subcategory ID",
     });
   }
 
-  if (
-    ["select", "multiselect"].includes(newInputType) &&
-    newOptions.filter((option) => typeof option === "string" && option.trim()).length === 0
-  ) {
+  if (!ALLOWED_INPUT_TYPES.includes(nextInputType)) {
     return res.status(400).json({
       success: false,
-      message: "Select and multiselect attributes require options",
+      message: "Invalid attribute input type",
+    });
+  }
+
+  for (const value of [isRequired, isFilterable, isVariant]) {
+    if (value !== undefined && typeof value !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "Attribute settings must be true or false",
+      });
+    }
+  }
+
+  const optionResult = validateOptions(nextOptions, nextInputType);
+
+  if (optionResult.error) {
+    return res.status(400).json({
+      success: false,
+      message: optionResult.error,
     });
   }
 
   const subcategory = await Subcategory.findOne({
-    _id: newSubCategory,
+    _id: nextSubCategory,
     isActive: true,
   });
 
@@ -328,11 +389,12 @@ export const updateAttribute = asyncHandler(async (req, res) => {
     });
   }
 
-  // Prevent duplicate keys within the same subcategory
+  const normalizedKey = nextKey.trim().toLowerCase();
+
   const duplicate = await Attribute.findOne({
     _id: { $ne: id },
-    subCategory: newSubCategory,
-    key: newKey,
+    subCategory: nextSubCategory,
+    key: normalizedKey,
   });
 
   if (duplicate) {
@@ -342,20 +404,28 @@ export const updateAttribute = asyncHandler(async (req, res) => {
     });
   }
 
-  if (name !== undefined) attribute.name = name.trim();
-
-  attribute.key = newKey;
-  attribute.subCategory = newSubCategory;
-  attribute.inputType = newInputType;
-  attribute.options = newOptions
-    .map((option) => option.trim())
-    .filter(Boolean);
+  attribute.name = nextName.trim();
+  attribute.key = normalizedKey;
+  attribute.subCategory = nextSubCategory;
+  attribute.inputType = nextInputType;
+  attribute.options = optionResult.options;
 
   if (isRequired !== undefined) attribute.isRequired = isRequired;
   if (isFilterable !== undefined) attribute.isFilterable = isFilterable;
   if (isVariant !== undefined) attribute.isVariant = isVariant;
 
-  await attribute.save();
+  try {
+    await attribute.save();
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "This attribute key already exists in this subcategory",
+      });
+    }
+
+    throw error;
+  }
 
   return res.status(200).json({
     success: true,
@@ -363,8 +433,6 @@ export const updateAttribute = asyncHandler(async (req, res) => {
     data: attribute,
   });
 });
-
-
 
 export const deleteAttribute = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -386,7 +454,6 @@ export const deleteAttribute = asyncHandler(async (req, res) => {
   }
 
   attribute.isActive = false;
-
   await attribute.save();
 
   return res.status(200).json({

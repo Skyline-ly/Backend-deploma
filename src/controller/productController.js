@@ -1,6 +1,8 @@
 import asyncHandler from "express-async-handler";
 import mongoose from "mongoose";
 import { Product } from "../model/Product.js";
+import { Attribute } from "../model/Attribute.js";
+import { Subcategory } from "../model/Subcategory.js";
 import { User } from "../model/User.js";
 
 async function getApprovedSellerIds() {
@@ -29,6 +31,206 @@ function uploadedProductImages(files = []) {
     url: file.path,
     publicId: file.filename,
   }));
+}
+
+function plainObject(value) {
+  return value instanceof Map ? Object.fromEntries(value) : value;
+}
+
+function normalizeAttributeValues(input, definitions, isVariant) {
+  const values = plainObject(input);
+  if (!values || typeof values !== "object" || Array.isArray(values)) {
+    return { error: "Product attributes must be an object" };
+  }
+
+  const allDefinitionsByIdentifier = new Map();
+  for (const definition of definitions) {
+    for (const identifier of [definition.key, definition.name, definition._id?.toString()]) {
+      if (identifier) {
+        allDefinitionsByIdentifier.set(identifier.trim().toLowerCase(), definition);
+      }
+    }
+  }
+  const relevantDefinitions = definitions.filter(
+    (definition) => definition.isVariant === isVariant
+  );
+  const definitionsByIdentifier = new Map();
+  for (const definition of relevantDefinitions) {
+    for (const identifier of [definition.key, definition.name, definition._id?.toString()]) {
+      if (identifier) {
+        definitionsByIdentifier.set(identifier.trim().toLowerCase(), definition);
+      }
+    }
+  }
+  const normalized = {};
+
+  for (const [key, value] of Object.entries(values)) {
+    const normalizedKey = key.trim().toLowerCase();
+    const definition = definitionsByIdentifier.get(normalizedKey);
+    if (!definition) {
+      const existingDefinition = allDefinitionsByIdentifier.get(normalizedKey);
+      if (existingDefinition) {
+        return {
+          error: `${existingDefinition.name} is not configured as a variant attribute for this subcategory`,
+        };
+      }
+      return { error: `Unknown ${isVariant ? "variant " : ""}attribute: ${key}` };
+    }
+
+    if (definition.inputType === "multiselect") {
+      const selectedValues = Array.isArray(value)
+        ? value
+        : typeof value === "string" && value
+          ? value.split(",").map((item) => item.trim())
+          : [];
+      if (selectedValues.some((item) => typeof item !== "string")) {
+        return { error: `${definition.name} must contain valid options` };
+      }
+      const cleanedValues = [...new Set(selectedValues.map((item) => item.trim()).filter(Boolean))];
+      if (
+        cleanedValues.some((item) => !definition.options.includes(item)) ||
+        (isVariant && cleanedValues.length > 1)
+      ) {
+        return {
+          error: `${definition.name} contains an invalid option`,
+        };
+      }
+      if (cleanedValues.length) normalized[definition.key] = cleanedValues.join(", ");
+      continue;
+    }
+
+    if (
+      typeof value !== "string" &&
+      typeof value !== "number" &&
+      typeof value !== "boolean"
+    ) {
+      return { error: `${definition.name} must be a single value` };
+    }
+
+    const normalizedValue = String(value).trim();
+    if (!normalizedValue) continue;
+
+    if (
+      definition.inputType === "select" &&
+      !definition.options.includes(normalizedValue)
+    ) {
+      return { error: `${definition.name} contains an invalid option` };
+    }
+    if (
+      definition.inputType === "boolean" &&
+      !["true", "false"].includes(normalizedValue)
+    ) {
+      return { error: `${definition.name} must be yes or no` };
+    }
+    if (
+      definition.inputType === "number" &&
+      !Number.isFinite(Number(normalizedValue))
+    ) {
+      return { error: `${definition.name} must be a valid number` };
+    }
+
+    normalized[definition.key] = normalizedValue;
+  }
+
+  for (const definition of relevantDefinitions) {
+    const value = normalized[definition.key];
+    if ((isVariant || definition.isRequired) && !value) {
+      return { error: `${definition.name} is required` };
+    }
+  }
+
+  return { values: normalized };
+}
+
+async function normalizeProductConfiguration(subCategory, attributes, variants) {
+  const definitions = await Attribute.find({
+    subCategory,
+    isActive: true,
+  }).select("name key inputType options isRequired isVariant");
+  const normalizedAttributes = normalizeAttributeValues(
+    attributes,
+    definitions,
+    false
+  );
+  if (normalizedAttributes.error) return normalizedAttributes;
+
+  if (!Array.isArray(variants)) {
+    return { error: "Variants must be an array" };
+  }
+
+  const variantDefinitions = definitions.filter(
+    (definition) => definition.isVariant
+  );
+  if (variantDefinitions.length && !variants.length) {
+    return { error: "Add at least one product variant" };
+  }
+  if (!variantDefinitions.length && variants.length) {
+    return { error: "This subcategory does not have variant attributes" };
+  }
+
+  const seenSkus = new Set();
+  const seenCombinations = new Set();
+  const normalizedVariants = [];
+  for (const variant of variants) {
+    if (!variant || typeof variant !== "object" || Array.isArray(variant)) {
+      return { error: "Each variant must be an object" };
+    }
+
+    const normalizedVariantAttributes = normalizeAttributeValues(
+      variant.attributes || {},
+      definitions,
+      true
+    );
+    if (normalizedVariantAttributes.error) {
+      return normalizedVariantAttributes;
+    }
+
+    const price = Number(variant.price);
+    const stock = Number(variant.stock);
+    const sku = typeof variant.sku === "string" ? variant.sku.trim() : "";
+    if (!Number.isFinite(price) || price < 0) {
+      return { error: "Each variant needs a non-negative price" };
+    }
+    if (!Number.isSafeInteger(stock) || stock < 0) {
+      return { error: "Each variant needs a non-negative whole-number stock" };
+    }
+    if (!sku) return { error: "Each variant needs a SKU" };
+    const normalizedSku = sku.toLowerCase();
+    if (seenSkus.has(normalizedSku)) {
+      return { error: "Variant SKUs must be unique" };
+    }
+    seenSkus.add(normalizedSku);
+
+    const combination = JSON.stringify(
+      Object.entries(normalizedVariantAttributes.values).sort(([left], [right]) =>
+        left.localeCompare(right)
+      )
+    );
+    if (seenCombinations.has(combination)) {
+      return { error: "Each variant must have a unique attribute combination" };
+    }
+    seenCombinations.add(combination);
+
+    const normalizedVariant = {
+      attributes: normalizedVariantAttributes.values,
+      price,
+      stock,
+      sku,
+    };
+    if (variant.discountPrice !== "" && variant.discountPrice !== undefined) {
+      const discountPrice = Number(variant.discountPrice);
+      if (!Number.isFinite(discountPrice) || discountPrice < 0) {
+        return { error: "Variant discount prices cannot be negative" };
+      }
+      normalizedVariant.discountPrice = discountPrice;
+    }
+    normalizedVariants.push(normalizedVariant);
+  }
+
+  return {
+    attributes: normalizedAttributes.values,
+    variants: normalizedVariants,
+  };
 }
 
 export const createProduct = asyncHandler(async (req, res) => {
@@ -72,24 +274,28 @@ export const createProduct = asyncHandler(async (req, res) => {
     });
   }
 
+  const includesVariants = Array.isArray(variants) && variants.length > 0;
   if (
     !name ||
     !description ||
-    basePrice === undefined ||
+    (!includesVariants && basePrice === undefined) ||
     !category ||
     !subCategory
   ) {
     return res.status(400).json({
       success: false,
       message:
-        "Name, description, base price, category and subcategory are required",
+        "Name, description, price, category and subcategory are required",
     });
   }
 
-  if (Number(basePrice) < 0) {
+  if (
+    !includesVariants &&
+    (!Number.isFinite(Number(basePrice)) || Number(basePrice) < 0)
+  ) {
     return res.status(400).json({
       success: false,
-      message: "Base price cannot be negative",
+      message: "Base price must be a non-negative number",
     });
   }
 
@@ -124,6 +330,30 @@ export const createProduct = asyncHandler(async (req, res) => {
     });
   }
 
+  const subcategory = await Subcategory.findOne({
+    _id: subCategory,
+    category,
+    isActive: true,
+  }).select("_id");
+  if (!subcategory) {
+    return res.status(400).json({
+      success: false,
+      message: "Choose an active subcategory in the selected category",
+    });
+  }
+
+  const configuration = await normalizeProductConfiguration(
+    subCategory,
+    attributes,
+    variants
+  );
+  if (configuration.error) {
+    return res.status(400).json({
+      success: false,
+      message: configuration.error,
+    });
+  }
+
   if (brand && !mongoose.Types.ObjectId.isValid(brand)) {
     return res.status(400).json({
       success: false,
@@ -134,8 +364,10 @@ export const createProduct = asyncHandler(async (req, res) => {
   const product = await Product.create({
     name: name.trim(),
     description: description.trim(),
-    basePrice: Number(basePrice),
-    discountPrice:
+    basePrice: configuration.variants.length
+      ? Math.min(...configuration.variants.map((variant) => variant.price))
+      : Number(basePrice),
+    discountPrice: !configuration.variants.length &&
       discountPrice !== undefined && discountPrice !== null
         ? Number(discountPrice)
         : undefined,
@@ -143,8 +375,8 @@ export const createProduct = asyncHandler(async (req, res) => {
     category,
     subCategory,
     brand: brand || null,
-    attributes: attributes || {},
-    variants: variants || [],
+    attributes: configuration.attributes,
+    variants: configuration.variants,
     images: uploadedProductImages(req.files),
     condition: condition || "new",
     seller: req.user.userId,
@@ -681,6 +913,20 @@ export const updateProduct = asyncHandler(async (req, res) => {
     product.subCategory = subCategory;
   }
 
+  if (category !== undefined || subCategory !== undefined) {
+    const subcategory = await Subcategory.findOne({
+      _id: product.subCategory,
+      category: product.category,
+      isActive: true,
+    }).select("_id");
+    if (!subcategory) {
+      return res.status(400).json({
+        success: false,
+        message: "Choose an active subcategory in the selected category",
+      });
+    }
+  }
+
   if (brand !== undefined) {
     if (brand !== null && !mongoose.Types.ObjectId.isValid(brand)) {
       return res.status(400).json({
@@ -692,12 +938,31 @@ export const updateProduct = asyncHandler(async (req, res) => {
     product.brand = brand;
   }
 
-  if (attributes !== undefined) {
-    product.attributes = attributes;
-  }
-
-  if (variants !== undefined) {
-    product.variants = variants;
+  if (attributes !== undefined || variants !== undefined) {
+    const configuration = await normalizeProductConfiguration(
+      product.subCategory,
+      attributes === undefined ? plainObject(product.attributes) : attributes,
+      variants === undefined
+        ? product.variants.map((variant) => ({
+            ...variant.toObject(),
+            attributes: plainObject(variant.attributes),
+          }))
+        : variants
+    );
+    if (configuration.error) {
+      return res.status(400).json({
+        success: false,
+        message: configuration.error,
+      });
+    }
+    product.attributes = configuration.attributes;
+    product.variants = configuration.variants;
+    if (configuration.variants.length) {
+      product.basePrice = Math.min(
+        ...configuration.variants.map((variant) => variant.price)
+      );
+      product.discountPrice = undefined;
+    }
   }
 
   if (req.files?.length) {
