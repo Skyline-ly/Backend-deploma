@@ -42,7 +42,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5174",
-      "https://frontend-2eeqe4sxa-skyline-lys-projects.vercel.app",
+      "https://shopeveryday.netlify.app/",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
