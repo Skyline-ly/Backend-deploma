@@ -40,13 +40,15 @@ app.use(JSCatch)
 
 app.use(
   cors({
-    origin: "http://localhost:5174",
+    origin: [
+      "http://localhost:5174",
+      "https://frontend-2eeqe4sxa-skyline-lys-projects.vercel.app",
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
 
 app.use("/api/auth",AuthRouter );
 app.use('/api/user',UserRouther)
