@@ -42,7 +42,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5174",
-      "https://shopeveryday.netlify.app/",
+      "https://frontend-ecm-six.vercel.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -66,7 +66,7 @@ app.use('/api/review',ReviewRouter)
 app.use('/api/notifications', NotificationRouter)
 
 app.get("/", (req, res) => {
-  res.json({ message: "Welcome to the E-commerce API" });
+  res.json({ message: "Welcome to the E-commerce API HI" });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
