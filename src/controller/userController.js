@@ -1,13 +1,19 @@
 
 import asynchandler from 'express-async-handler'
 import { User } from '../model/User.js'
+import { notifyAdmins } from '../service/notifications.js'
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 
 export const userPending = asynchandler(async (req, res) => {
-
-  const sellers = await User.find({
+  const { range, error } = getCreatedAtRange(req.query)
+  if (error) {
+    return res.status(400).json({ success: false, message: error })
+  }
+  const query = applyCreatedAtRange({
     role: 'customer',
     sellerStatus: 'pending'
-  }).select('-password');
+  }, range)
+  const sellers = await User.find(query).select('-password');
 
   return res.status(200).json({
     success: true,
@@ -27,6 +33,11 @@ export const searchUser = asynchandler(async (req, res) => {
   );
 
   const query = {}
+  const { range, error } = getCreatedAtRange(req.query)
+  if (error) {
+    return res.status(400).json({ success: false, message: error })
+  }
+  applyCreatedAtRange(query, range)
 
   if (typeof search === 'string' && search.trim()) {
     query.name = { $regex: search.trim(), $options: 'i' }
@@ -385,7 +396,23 @@ export const becomeSeller = asynchandler(async (req, res) => {
 
   user.sellerStatus = "pending";
 
-  await user.save();
+  const session = await User.startSession();
+  try {
+    await session.withTransaction(async () => {
+      await user.save({ session });
+      await notifyAdmins(
+        {
+          type: "new_seller_application",
+          title: "New seller application",
+          message: `${user.name} submitted a seller application.`,
+          href: "/admin/sellers",
+        },
+        session
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
 
   return res.status(200).json({
     success: true,

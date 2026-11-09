@@ -1,6 +1,7 @@
 
 import asynhandler from 'express-async-handler'
 import { Brand } from '../model/Brand.js'
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 
 
 export const createBrand= asynhandler(async(req,res)=>{
@@ -150,8 +151,12 @@ export const getBrand=asynhandler(async(req,res)=>{
 })
 
 export const getAdminBrands=asynhandler(async(req,res)=>{
-    const {page=1,limit=20,category,search}=req.query
+    const {page=1,limit=20,category,subCategory,search}=req.query
     const query={}
+    const { range, error } = getCreatedAtRange(req.query)
+    if(error){
+        return res.status(400).json({ success:false, message:error })
+    }
 
     if(typeof search === 'string' && search.trim()){
         query.name={$regex:search.trim(),$options:'i'}
@@ -159,6 +164,10 @@ export const getAdminBrands=asynhandler(async(req,res)=>{
     if(category){
         query.category=category
     }
+    if(subCategory){
+        query.subCategory=subCategory
+    }
+    applyCreatedAtRange(query, range)
     
 
     const result=await Brand.paginate(query,{

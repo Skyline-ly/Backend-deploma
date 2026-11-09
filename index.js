@@ -15,12 +15,13 @@ import ProductRputer from "./src/route/productRoute.js";
 import SubCategoryRouter from "./src/route/subCategoryRoute.js";
 import CartRouter from "./src/route/cartRoute.js";
 import orderRoute from "./src/route/orderRoute.js";
-// import PaymentRouter from "./src/route/paymentRoute.js";
+
 import ConversationRouter from "./src/route/conversationRoutes.js";
 import MessageRouter from "./src/route/messageRoutes.js";
 import AttributeRouter from "./src/route/attributeRoute.js";
 import WishlistRouter from "./src/route/wishListRoute.js";
 import ReviewRouter from "./src/route/reviewRoute.js";
+import NotificationRouter from "./src/route/notificationRoute.js";
 
 
 
@@ -36,13 +37,10 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(mongoSanitize())
 app.use(JSCatch)
-// app.use(cors());
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5174",
-      "https://magical-praline-869785.netlify.app",
-    ],
+    origin: "http://localhost:5174",
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -58,17 +56,17 @@ app.use('/api/brand',BrandRouter)
 app.use('/api/product',ProductRputer)
 app.use('/api/cart',CartRouter)
 app.use('/api/order',orderRoute)
-// app.use('/api/payment',PaymentRouter)
 app.use('/api/conversation',ConversationRouter)
 app.use('/api/message',MessageRouter)
 app.use('/api/attribute',AttributeRouter)
 app.use('/api/wishlist',WishlistRouter)
 app.use('/api/review',ReviewRouter)
+app.use('/api/notifications', NotificationRouter)
 
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to the E-commerce API" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT}`);
 });

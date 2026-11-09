@@ -1,9 +1,11 @@
 import asyncHandler from "express-async-handler";
 import mongoose from "mongoose";
 import { Product } from "../model/Product.js";
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 import { Attribute } from "../model/Attribute.js";
 import { Subcategory } from "../model/Subcategory.js";
 import { User } from "../model/User.js";
+import { notifyAdmins } from "../service/notifications.js";
 
 async function getApprovedSellerIds() {
   return User.distinct("_id", {
@@ -31,6 +33,50 @@ function uploadedProductImages(files = []) {
     url: file.path,
     publicId: file.filename,
   }));
+}
+
+function attachVariantImages(variants, variantInputs, files = [], existingVariants = []) {
+  const usedFileIndexes = new Set();
+  const variantsWithImages = [];
+
+  for (const [index, variant] of variants.entries()) {
+    const input = variantInputs[index] || {};
+    const variantId = input.variantId || input._id;
+    const existingVariant = variantId
+      ? existingVariants.find(
+          (item) => item._id.toString() === String(variantId)
+        )
+      : null;
+    let image;
+
+    if (input.imageFileIndex !== undefined && input.imageFileIndex !== "") {
+      const fileIndex = Number(input.imageFileIndex);
+      if (
+        !Number.isSafeInteger(fileIndex) ||
+        fileIndex < 0 ||
+        fileIndex >= files.length ||
+        usedFileIndexes.has(fileIndex)
+      ) {
+        return { error: "Each variant image must reference one uploaded image" };
+      }
+      usedFileIndexes.add(fileIndex);
+      image = files[fileIndex].path;
+    } else {
+      image = existingVariant?.image;
+    }
+
+    variantsWithImages.push({
+      ...variant,
+      ...(existingVariant ? { _id: existingVariant._id } : {}),
+      ...(image ? { image } : {}),
+    });
+  }
+
+  if (usedFileIndexes.size !== files.length) {
+    return { error: "An uploaded variant image was not assigned to a variant" };
+  }
+
+  return { variants: variantsWithImages };
 }
 
 function plainObject(value) {
@@ -267,7 +313,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     });
   }
 
-  if (!req.files?.length) {
+  if (!req.files?.images?.length) {
     return res.status(400).json({
       success: false,
       message: "At least one product image file is required",
@@ -354,6 +400,18 @@ export const createProduct = asyncHandler(async (req, res) => {
     });
   }
 
+  const variantsWithImages = attachVariantImages(
+    configuration.variants,
+    variants,
+    req.files?.variantImages
+  );
+  if (variantsWithImages.error) {
+    return res.status(400).json({
+      success: false,
+      message: variantsWithImages.error,
+    });
+  }
+
   if (brand && !mongoose.Types.ObjectId.isValid(brand)) {
     return res.status(400).json({
       success: false,
@@ -361,27 +419,50 @@ export const createProduct = asyncHandler(async (req, res) => {
     });
   }
 
-  const product = await Product.create({
-    name: name.trim(),
-    description: description.trim(),
-    basePrice: configuration.variants.length
-      ? Math.min(...configuration.variants.map((variant) => variant.price))
-      : Number(basePrice),
-    discountPrice: !configuration.variants.length &&
-      discountPrice !== undefined && discountPrice !== null
-        ? Number(discountPrice)
-        : undefined,
-    stock: stock !== undefined ? Number(stock) : 0,
-    category,
-    subCategory,
-    brand: brand || null,
-    attributes: configuration.attributes,
-    variants: configuration.variants,
-    images: uploadedProductImages(req.files),
-    condition: condition || "new",
-    seller: req.user.userId,
-    approvalStatus: "pending",
-  });
+  const session = await mongoose.startSession();
+  let product;
+  try {
+    await session.withTransaction(async () => {
+      [product] = await Product.create(
+        [
+          {
+            name: name.trim(),
+            description: description.trim(),
+            basePrice: configuration.variants.length
+              ? Math.min(...configuration.variants.map((variant) => variant.price))
+              : Number(basePrice),
+            discountPrice: !configuration.variants.length &&
+              discountPrice !== undefined && discountPrice !== null
+                ? Number(discountPrice)
+                : undefined,
+            stock: stock !== undefined ? Number(stock) : 0,
+            category,
+            subCategory,
+            brand: brand || null,
+            attributes: configuration.attributes,
+            variants: variantsWithImages.variants,
+            images: uploadedProductImages(req.files.images),
+            condition: condition || "new",
+            seller: req.user.userId,
+            approvalStatus: "pending",
+          },
+        ],
+        { session }
+      );
+
+      await notifyAdmins(
+        {
+          type: "new_product_submission",
+          title: "Product submitted for review",
+          message: `${product.name} is awaiting admin approval.`,
+          href: "/admin/products",
+        },
+        session
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
 
   return res.status(201).json({
     success: true,
@@ -410,59 +491,11 @@ export const getMyProducts = asyncHandler(async (req, res) => {
     seller: req.user.userId,
     isActive: true,
   };
-  const { fromDate, toDate } = req.query;
-
-  if (fromDate || toDate) {
-    const dateRange = {};
-    const parseDate = (value) => {
-      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        return null;
-      }
-
-      const date = new Date(`${value}T00:00:00.000Z`);
-      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
-        return null;
-      }
-
-      return date;
-    };
-
-    if (fromDate) {
-      const startDate = parseDate(fromDate);
-      if (!startDate) {
-        return res.status(400).json({
-          success: false,
-          message: "fromDate must be a valid date in YYYY-MM-DD format",
-        });
-      }
-      dateRange.$gte = startDate;
-    }
-
-    if (toDate) {
-      const endDate = parseDate(toDate);
-      if (!endDate) {
-        return res.status(400).json({
-          success: false,
-          message: "toDate must be a valid date in YYYY-MM-DD format",
-        });
-      }
-      endDate.setUTCDate(endDate.getUTCDate() + 1);
-      dateRange.$lt = endDate;
-    }
-
-    if (
-      dateRange.$gte &&
-      dateRange.$lt &&
-      dateRange.$gte >= dateRange.$lt
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "fromDate must be on or before toDate",
-      });
-    }
-
-    query.createdAt = dateRange;
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
   }
+  applyCreatedAtRange(query, range);
 
   const products = await Product.paginate(
     query,
@@ -489,8 +522,16 @@ export const getMyProducts = asyncHandler(async (req, res) => {
 
 export const getPendingProducts = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
-  const products = await Product.paginate(
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  const query = applyCreatedAtRange(
     { approvalStatus: "pending", isActive: true },
+    range
+  );
+  const products = await Product.paginate(
+    query,
     {
       page: Number(page),
       limit: Number(limit),
@@ -521,7 +562,11 @@ export const getPendingProducts = asyncHandler(async (req, res) => {
 export const getAdminProducts = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
-  const query = {};
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  const query = applyCreatedAtRange({}, range);
 
   if (typeof req.query.search === "string" && req.query.search.trim()) {
     query.name = { $regex: req.query.search.trim(), $options: "i" };
@@ -939,15 +984,17 @@ export const updateProduct = asyncHandler(async (req, res) => {
   }
 
   if (attributes !== undefined || variants !== undefined) {
+    const variantInputs = variants === undefined
+      ? product.variants.map((variant) => ({
+          ...variant.toObject(),
+          variantId: variant._id.toString(),
+          attributes: plainObject(variant.attributes),
+        }))
+      : variants;
     const configuration = await normalizeProductConfiguration(
       product.subCategory,
       attributes === undefined ? plainObject(product.attributes) : attributes,
-      variants === undefined
-        ? product.variants.map((variant) => ({
-            ...variant.toObject(),
-            attributes: plainObject(variant.attributes),
-          }))
-        : variants
+      variantInputs
     );
     if (configuration.error) {
       return res.status(400).json({
@@ -955,8 +1002,20 @@ export const updateProduct = asyncHandler(async (req, res) => {
         message: configuration.error,
       });
     }
+    const variantsWithImages = attachVariantImages(
+      configuration.variants,
+      variantInputs,
+      req.files?.variantImages,
+      product.variants
+    );
+    if (variantsWithImages.error) {
+      return res.status(400).json({
+        success: false,
+        message: variantsWithImages.error,
+      });
+    }
     product.attributes = configuration.attributes;
-    product.variants = configuration.variants;
+    product.variants = variantsWithImages.variants;
     if (configuration.variants.length) {
       product.basePrice = Math.min(
         ...configuration.variants.map((variant) => variant.price)
@@ -965,8 +1024,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
     }
   }
 
-  if (req.files?.length) {
-    product.images = uploadedProductImages(req.files);
+  if (req.files?.images?.length) {
+    product.images = uploadedProductImages(req.files.images);
   }
 
   if (condition !== undefined) {

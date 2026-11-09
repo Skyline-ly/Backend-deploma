@@ -10,6 +10,7 @@ import {
   getSellerSales,
   updateOrderStatus,
   cancelOrder,
+  getOrderStatusOptions,
 } from "../controller/orderContoller.js";
 import { verifiveToken } from "../middleware/verifyToken.js";
 import { authorizeRoles } from "../middleware/catchByRole.js";
@@ -31,6 +32,13 @@ orderRoute.get(
   verifiveToken,
   authorizeRoles("admin"),
   getAdminOrders
+);
+
+orderRoute.get(
+  "/status-options",
+  verifiveToken,
+  authorizeRoles("customer", "seller", "admin"),
+  getOrderStatusOptions
 );
 
 orderRoute.get(
@@ -75,7 +83,7 @@ orderRoute.get(
 orderRoute.patch(
   "/:id/status",
   verifiveToken,
-  authorizeRoles("seller", "admin"),
+  authorizeRoles("seller"),
   requireApprovedSeller,
   updateOrderStatus
 );

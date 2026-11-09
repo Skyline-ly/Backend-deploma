@@ -1,6 +1,7 @@
 import asyncHandler from "express-async-handler";
 import mongoose from "mongoose";
 import { Subcategory } from "../model/Subcategory.js";
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -30,6 +31,11 @@ export const getSubcategory = asyncHandler(async (req, res) => {
   }
 
   const query = { isActive: true };
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  applyCreatedAtRange(query, range);
 
   if (typeof search === "string" && search.trim()) {
     query.name = {

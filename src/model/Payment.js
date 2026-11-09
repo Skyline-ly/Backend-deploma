@@ -32,27 +32,14 @@ const paymentSchema = new mongoose.Schema(
 
     method: {
       type: String,
-      enum: ["COD", "KHQR"],
-      default: "KHQR",
+      enum: ["COD"],
+      default: "COD",
       required: true,
     },
 
     gateway: {
       type: String,
-      default: "Bakong",
-    },
-
-    qrString: {
-      type: String,
-      default: null,
-      select: false,
-    },
-
-  
-    paymentHash: {
-      type: String,
-      default: null,
-      select: false,
+      default: "Cash on Delivery",
     },
 
     transactionId: {
@@ -66,8 +53,6 @@ const paymentSchema = new mongoose.Schema(
         "Pending",
         "Paid",
         "Failed",
-        "Expired",
-        "Refunded",
         "Cancelled",
       ],
       default: "Pending",
@@ -79,10 +64,6 @@ const paymentSchema = new mongoose.Schema(
       default: null,
     },
 
-    expiresAt: {
-      type: Date,
-      default: null,
-    },
   },
   {
     timestamps: true,

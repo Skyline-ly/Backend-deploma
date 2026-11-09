@@ -1,6 +1,7 @@
 
 import asyncHandler from "express-async-handler";
 import { Category } from "../model/Category.js";
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 
 
 const escapeRegex = (value) =>
@@ -87,11 +88,18 @@ export const createCategory = asyncHandler(async (req, res) => {
 
 export const getCategory = asyncHandler(async (req, res) => {
     const { page, limit } = getPaginationOptions(req);
+    const { range, error } = getCreatedAtRange(req.query);
+    if (error) {
+        return res.status(400).json({ success: false, message: error });
+    }
 
-    const query = {
-        isActive: true,
-        ...getSearchQuery(req.query.search),
-    };
+    const query = applyCreatedAtRange(
+        {
+            isActive: true,
+            ...getSearchQuery(req.query.search),
+        },
+        range
+    );
 
     const categories = await Category.paginate(query, {
         page,
@@ -117,10 +125,15 @@ export const getCategory = asyncHandler(async (req, res) => {
 
 export const getAdminCategories = asyncHandler(async (req, res) => {
     const { page, limit } = getPaginationOptions(req);
+    const { range, error } = getCreatedAtRange(req.query);
+    if (error) {
+        return res.status(400).json({ success: false, message: error });
+    }
 
-    const query = {
-        ...getSearchQuery(req.query.search),
-    };
+    const query = applyCreatedAtRange(
+        { ...getSearchQuery(req.query.search) },
+        range
+    );
 
     const categories = await Category.paginate(query, {
         page,

@@ -7,6 +7,17 @@ import { Cart } from "../model/cart.js";
 import { Product } from "../model/Product.js";
 import { User } from "../model/User.js";
 import { Payment } from "../model/Payment.js";
+import {
+  CUSTOMER_ORDER_PROGRESS,
+  ORDER_SALE_STATUSES,
+  ORDER_STATUSES,
+  ORDER_STATUS_TRANSITIONS,
+} from "../constants/orderStatus.js";
+import {
+  createNotifications,
+  notifyAdmins,
+} from "../service/notifications.js";
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 
 async function restoreOrderStock(order, session) {
   if (!order.stockDeducted) return;
@@ -262,6 +273,21 @@ export const createOrder = asyncHandler(async (req, res) => {
         { session }
       );
 
+      const sellerIds = [
+        ...new Set(orderItems.map((item) => item.seller.toString())),
+      ];
+      const orderNumber = order._id.toString().slice(-8).toUpperCase();
+      await createNotifications(
+        sellerIds,
+        {
+          type: "new_order",
+          title: "New order received",
+          message: `Order #${orderNumber} includes items from your shop.`,
+          href: "/seller/orders",
+        },
+        session
+      );
+
       createdOrder = order;
 
     
@@ -294,6 +320,17 @@ export const getMyOrders = asyncHandler(async (req, res) => {
     status,
   } = req.query;
 
+  if (
+    status !== undefined &&
+    status !== "" &&
+    (typeof status !== "string" || !ORDER_STATUSES.includes(status))
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid order status filter",
+    });
+  }
+
   const query = {
     customer: userId,
   };
@@ -321,10 +358,25 @@ export const getMyOrders = asyncHandler(async (req, res) => {
 export const getAdminOrders = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
-  const query = {};
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  const query = applyCreatedAtRange({}, range);
 
   if (typeof req.query.status === "string" && req.query.status) {
+    if (!ORDER_STATUSES.includes(req.query.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order status filter",
+      });
+    }
     query.status = req.query.status;
+  } else if (req.query.status !== undefined && req.query.status !== "") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid order status filter",
+    });
   }
 
   const orders = await Order.paginate(query, {
@@ -340,6 +392,17 @@ export const getAdminOrders = asyncHandler(async (req, res) => {
   return res.status(200).json({
     success: true,
     data: orders,
+  });
+});
+
+export const getOrderStatusOptions = asyncHandler(async (req, res) => {
+  return res.status(200).json({
+    success: true,
+    data: {
+      statuses: ORDER_STATUSES,
+      transitions: ORDER_STATUS_TRANSITIONS,
+      customerProgress: CUSTOMER_ORDER_PROGRESS,
+    },
   });
 });
 
@@ -398,9 +461,25 @@ export const getSellerOrders = asyncHandler(async (req, res) => {
     status,
   } = req.query;
 
+  if (
+    status !== undefined &&
+    status !== "" &&
+    (typeof status !== "string" || !ORDER_STATUSES.includes(status))
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid order status filter",
+    });
+  }
+
   const query = {
     "items.seller": sellerId,
   };
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  applyCreatedAtRange(query, range);
 
   if (status) {
     query.status = status;
@@ -460,24 +539,10 @@ export const getSellerSales = asyncHandler(async (req, res) => {
     });
   }
 
-  const saleStatuses = [
-    "Paid",
-    "Packing",
-    "Out for Delivery",
-    "Success",
-    "In Transit",
-    "Delivered",
-    "Completed",
-    "Confirmed",
-    "Processing",
-    "Ready for Pickup",
-    "Picked Up",
-  ];
-
   const [report] = await Order.aggregate([
     {
       $match: {
-        status: { $in: saleStatuses },
+        status: { $in: ORDER_SALE_STATUSES },
         "items.seller": sellerId,
       },
     },
@@ -563,6 +628,13 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
   const userRole = req.user.role;
 
+  if (userRole !== "seller") {
+    return res.status(403).json({
+      success: false,
+      message: "Only sellers can update order status",
+    });
+  }
+
   const { id } = req.params;
   const { status } = req.body;
 
@@ -582,95 +654,18 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  const isAdmin = userRole === "admin";
-
   const isSellerInOrder = order.items.some(
     (item) => item.seller.toString() === userId.toString()
   );
 
-  if (userRole === "seller" && !isSellerInOrder) {
+  if (!isSellerInOrder) {
     return res.status(403).json({
       success: false,
       message: "You are not authorized to update this order",
     });
   }
 
-  const nextStatus = {
-    Pending: "Packing",
-    Packing: "Out for Delivery",
-    "Out for Delivery": "Success",
-    Paid: "Packing",
-    "In Transit": "Delivered",
-    Delivered: "Success",
-    Confirmed: "Processing",
-    Processing: "Ready for Pickup",
-    "Ready for Pickup": "Picked Up",
-  }[order.status];
-
-  if (status === "Cancelled") {
-    if (!isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: "Only an admin can cancel an order from this endpoint",
-      });
-    }
-    if (order.status !== "Pending") {
-      return res.status(400).json({
-        success: false,
-        message: "Only pending orders can be cancelled",
-      });
-    }
-
-    const session = await mongoose.startSession();
-    try {
-      let cancelledOrder;
-      await session.withTransaction(async () => {
-        cancelledOrder = await Order.findOneAndUpdate(
-          { _id: id, status: "Pending" },
-          {
-            $set: {
-              status: "Cancelled",
-              cancelledAt: new Date(),
-              stockDeducted: false,
-              paymentStatus: "Cancelled",
-            },
-          },
-          { new: true, session }
-        );
-        if (!cancelledOrder) {
-          const error = new Error("Order status changed before it could be cancelled");
-          error.statusCode = 409;
-          throw error;
-        }
-
-        await restoreOrderStock(order, session);
-        await Payment.updateMany(
-          { order: id, method: "COD", status: "Pending" },
-          { $set: { status: "Cancelled" } },
-          { session }
-        );
-      });
-      return res.status(200).json({
-        success: true,
-        message: "Order cancelled successfully",
-        data: cancelledOrder,
-      });
-    } catch (error) {
-      return res.status(error.statusCode || 500).json({
-        success: false,
-        message: error.message || "Failed to cancel order",
-      });
-    } finally {
-      await session.endSession();
-    }
-  }
-
-  if (!["seller", "admin"].includes(userRole)) {
-    return res.status(403).json({
-      success: false,
-      message: "You are not authorized to update this order",
-    });
-  }
+  const nextStatus = ORDER_STATUS_TRANSITIONS[order.status];
 
   if (status !== nextStatus) {
     return res.status(400).json({
@@ -724,6 +719,16 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
             { session }
           );
         }
+        await createNotifications(
+          updatedOrder.items.map((item) => item.seller),
+          {
+            type: "order_status",
+            title: "Order status updated",
+            message: `Order #${updatedOrder._id.toString().slice(-8).toUpperCase()} is now ${status}.`,
+            href: "/seller/orders",
+          },
+          session
+        );
       });
     } catch (error) {
       return res.status(error.statusCode || 500).json({
@@ -742,16 +747,39 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  const updatedOrder = await Order.findOneAndUpdate(
-    { _id: id, status: order.status },
-    { $set: { status } },
-    { new: true, runValidators: true }
-  );
-  if (!updatedOrder) {
-    return res.status(409).json({
-      success: false,
-      message: "Order status changed before it could be updated",
+  const session = await mongoose.startSession();
+  let updatedOrder;
+  try {
+    await session.withTransaction(async () => {
+      updatedOrder = await Order.findOneAndUpdate(
+        { _id: id, status: order.status },
+        { $set: { status } },
+        { new: true, runValidators: true, session }
+      );
+      if (!updatedOrder) {
+        const error = new Error("Order status changed before it could be updated");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      await createNotifications(
+        updatedOrder.items.map((item) => item.seller),
+        {
+          type: "order_status",
+          title: "Order status updated",
+          message: `Order #${updatedOrder._id.toString().slice(-8).toUpperCase()} is now ${status}.`,
+          href: "/seller/orders",
+        },
+        session
+      );
     });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to update order status",
+    });
+  } finally {
+    await session.endSession();
   }
 
   return res.status(200).json({
@@ -822,6 +850,23 @@ export const cancelOrder = asyncHandler(async (req, res) => {
         { order: id, method: "COD", status: "Pending" },
         { $set: { status: "Cancelled" } },
         { session }
+      );
+      const sellerIds = [
+        ...new Map(
+          order.items.map((item) => [item.seller.toString(), item.seller])
+        ).values(),
+      ];
+      const orderNumber = order._id.toString().slice(-8).toUpperCase();
+      const cancellationNotification = {
+        type: "order_cancelled",
+        title: "Order cancelled",
+        message: `Order #${orderNumber} was cancelled by the customer.`,
+        href: "/seller/orders",
+      };
+      await createNotifications(sellerIds, cancellationNotification, session);
+      await notifyAdmins(
+        { ...cancellationNotification, href: "/admin/orders" },
+        session
       );
     });
 

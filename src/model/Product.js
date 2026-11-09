@@ -94,7 +94,6 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
-    // Used when product has no variants
     stock: {
       type: Number,
       default: 0,

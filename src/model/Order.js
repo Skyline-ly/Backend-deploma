@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import mongoosePaginate from "mongoose-paginate-v2";
+import { ORDER_STATUSES } from "../constants/orderStatus.js";
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -110,13 +111,13 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["COD", "KHQR"],
+      enum: ["COD"],
       default: "COD",
     },
 
     paymentStatus: {
       type: String,
-      enum: ["Pending", "Paid", "Failed", "Refunded", "Cancelled"],
+      enum: ["Pending", "Paid", "Failed", "Cancelled"],
       default: "Pending",
       index: true,
     },
@@ -128,22 +129,7 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        "Pending",
-        "Paid",
-        "Packing",
-        "Out for Delivery",
-        "Success",
-        // Keep existing values readable for orders created before delivery tracking.
-        "In Transit",
-        "Delivered",
-        "Confirmed",
-        "Processing",
-        "Ready for Pickup",
-        "Picked Up",
-        "Completed",
-        "Cancelled",
-      ],
+      enum: ORDER_STATUSES,
       default: "Pending",
       index: true,
     },

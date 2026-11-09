@@ -55,7 +55,10 @@ ProductRouter.post(
   verifiveToken,
   authorizeRoles("seller"),
   requireApprovedSeller,
-  upload.array("images", 5),
+  upload.fields([
+    { name: "images", maxCount: 5 },
+    { name: "variantImages", maxCount: 100 },
+  ]),
   createProduct
 );
 
@@ -64,7 +67,10 @@ ProductRouter.put(
   verifiveToken,
   authorizeRoles("seller"),
   requireApprovedSeller,
-  upload.array("images", 5),
+  upload.fields([
+    { name: "images", maxCount: 5 },
+    { name: "variantImages", maxCount: 100 },
+  ]),
   updateProduct
 );
 

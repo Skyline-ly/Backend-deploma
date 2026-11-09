@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 import { Attribute } from "../model/Attribute.js";
 import { Subcategory } from "../model/Subcategory.js";
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 
 const ALLOWED_INPUT_TYPES = [
   "text",
@@ -176,6 +177,11 @@ export const getAllAttributes = asyncHandler(async (req, res) => {
   }
 
   const query = {};
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  applyCreatedAtRange(query, range);
 
   if (subCategory) {
     if (!mongoose.Types.ObjectId.isValid(subCategory)) {

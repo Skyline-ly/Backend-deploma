@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { Review } from "../model/Review.js";
 import { Order } from "../model/Order.js";
 import { Product } from "../model/Product.js";
+import { applyCreatedAtRange, getCreatedAtRange } from "../utils/dateRange.js";
 
 export const createReview = asyncHandler(async (req, res) => {
   const { productId, orderId, rating, comment = "" } = req.body;
@@ -166,15 +167,20 @@ export const getProductReviews = asyncHandler(async (req, res) => {
 export const getAdminReviews = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+  const { range, error } = getCreatedAtRange(req.query);
+  if (error) {
+    return res.status(400).json({ success: false, message: error });
+  }
+  const query = applyCreatedAtRange({}, range);
   const [reviews, totalDocs] = await Promise.all([
-    Review.find()
+    Review.find(query)
       .populate("product", "name")
       .populate("customer", "name email")
       .populate("order", "status")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
-    Review.countDocuments(),
+    Review.countDocuments(query),
   ]);
 
   return res.status(200).json({
