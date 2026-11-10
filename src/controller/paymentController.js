@@ -140,19 +140,23 @@ export const createPayWayPayment = asyncHandler(async (req, res) => {
       message: "Unable to connect to PayWay to create the payment",
     });
   }
-  const data = await paywayResponse.json().catch(() => null);
-
-  if (!paywayResponse.ok || !data) {
-    return res.status(502).json({
-      success: false,
-      message: "PayWay did not return a valid payment response",
-    });
+  const responseBody = await paywayResponse.text();
+  let data;
+  try {
+    data = JSON.parse(responseBody);
+  } catch {
+    data = null;
   }
-  if (data.status?.code !== "00") {
+
+  if (!data || !paywayResponse.ok || data.status?.code !== "00") {
+    const gatewayStatus = data?.status;
     return res.status(502).json({
       success: false,
-      message: data.status?.message || "PayWay could not create the payment",
-      status: data.status,
+      message:
+        gatewayStatus?.message ||
+        `PayWay returned HTTP ${paywayResponse.status} without a successful payment response`,
+      gatewayCode: gatewayStatus?.code || null,
+      gatewayHttpStatus: paywayResponse.status,
     });
   }
 
@@ -232,19 +236,23 @@ export const checkPayWayPaymentStatus = asyncHandler(async (req, res) => {
       message: "Unable to connect to PayWay to check payment status",
     });
   }
-  const data = await paywayResponse.json().catch(() => null);
-
-  if (!paywayResponse.ok || !data) {
-    return res.status(502).json({
-      success: false,
-      message: "PayWay did not return a valid status response",
-    });
+  const responseBody = await paywayResponse.text();
+  let data;
+  try {
+    data = JSON.parse(responseBody);
+  } catch {
+    data = null;
   }
-  if (data.status?.code !== "00") {
+
+  if (!data || !paywayResponse.ok || data.status?.code !== "00") {
+    const gatewayStatus = data?.status;
     return res.status(502).json({
       success: false,
-      message: data.status?.message || "PayWay could not check payment status",
-      status: data.status,
+      message:
+        gatewayStatus?.message ||
+        `PayWay returned HTTP ${paywayResponse.status} without a successful status response`,
+      gatewayCode: gatewayStatus?.code || null,
+      gatewayHttpStatus: paywayResponse.status,
     });
   }
 
