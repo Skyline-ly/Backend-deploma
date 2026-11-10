@@ -44,7 +44,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5174",
-      "https://frontend-ecm-six.vercel.app",
+      "https://frontend-ecm-icvm.vercel.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
