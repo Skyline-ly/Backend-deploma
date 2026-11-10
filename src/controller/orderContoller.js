@@ -41,6 +41,14 @@ export const createOrder = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
 
   const { deliveryInfo } = req.body;
+  const paymentMethod = req.body.paymentMethod || "COD";
+
+  if (!["COD", "PayWay"].includes(paymentMethod)) {
+    return res.status(400).json({
+      success: false,
+      message: "Payment method must be COD or PayWay",
+    });
+  }
 
   if (
     !deliveryInfo ||
@@ -222,7 +230,7 @@ export const createOrder = asyncHandler(async (req, res) => {
               address: deliveryInfo.address.trim(),
               note: deliveryInfo.note?.trim() || null,
             },
-            paymentMethod: "COD",
+            paymentMethod,
             paymentStatus: "Pending",
             stockDeducted: true,
             status: "Pending",
@@ -265,8 +273,8 @@ export const createOrder = asyncHandler(async (req, res) => {
             customer: userId,
             amount: subtotal,
             currency: "USD",
-            method: "COD",
-            gateway: "Cash on Delivery",
+            method: paymentMethod,
+            gateway: paymentMethod === "PayWay" ? "ABA PayWay" : "Cash on Delivery",
             status: "Pending",
           },
         ],
@@ -665,6 +673,13 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     });
   }
 
+  if (order.paymentMethod === "PayWay" && order.paymentStatus !== "Paid") {
+    return res.status(400).json({
+      success: false,
+      message: "The customer must complete PayWay payment before this order can be processed",
+    });
+  }
+
   const nextStatus = ORDER_STATUS_TRANSITIONS[order.status];
 
   if (status !== nextStatus) {
@@ -697,7 +712,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         }
 
         const payment = await Payment.findOneAndUpdate(
-          { order: id, method: "COD", status: "Pending" },
+          { order: id, status: "Pending" },
           { $set: { status: "Paid", paidAt: new Date() } },
           { new: true, session }
         );
@@ -847,7 +862,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
 
       await restoreOrderStock(order, session);
       await Payment.updateMany(
-        { order: id, method: "COD", status: "Pending" },
+        { order: id, status: "Pending" },
         { $set: { status: "Cancelled" } },
         { session }
       );

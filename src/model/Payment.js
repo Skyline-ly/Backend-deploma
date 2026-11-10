@@ -32,7 +32,7 @@ const paymentSchema = new mongoose.Schema(
 
     method: {
       type: String,
-      enum: ["COD"],
+      enum: ["COD", "PayWay"],
       default: "COD",
       required: true,
     },
@@ -40,6 +40,21 @@ const paymentSchema = new mongoose.Schema(
     gateway: {
       type: String,
       default: "Cash on Delivery",
+    },
+
+    qrImage: {
+      type: String,
+      default: "",
+    },
+
+    abaPaywayDeeplink: {
+      type: String,
+      default: "",
+    },
+
+    gatewayResponse: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
 
     transactionId: {
