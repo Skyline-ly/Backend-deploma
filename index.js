@@ -22,6 +22,7 @@ import AttributeRouter from "./src/route/attributeRoute.js";
 import WishlistRouter from "./src/route/wishListRoute.js";
 import ReviewRouter from "./src/route/reviewRoute.js";
 import NotificationRouter from "./src/route/notificationRoute.js";
+import PayWayRouter from "./src/controller/paymentController.js";
 
 
 
@@ -37,6 +38,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(mongoSanitize())
 app.use(JSCatch)
+app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
@@ -64,6 +66,7 @@ app.use('/api/attribute',AttributeRouter)
 app.use('/api/wishlist',WishlistRouter)
 app.use('/api/review',ReviewRouter)
 app.use('/api/notifications', NotificationRouter)
+app.use(PayWayRouter)
 
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to the E-commerce API HI" });
