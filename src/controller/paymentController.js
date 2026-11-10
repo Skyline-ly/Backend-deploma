@@ -143,7 +143,10 @@ export const createPayWayPayment = asyncHandler(async (req, res) => {
   const data = await paywayResponse.json().catch(() => null);
 
   if (!paywayResponse.ok || !data) {
-    throw gatewayError("PayWay did not return a valid payment response", 502);
+    return res.status(502).json({
+      success: false,
+      message: "PayWay did not return a valid payment response",
+    });
   }
   if (data.status?.code !== "00") {
     return res.status(502).json({
@@ -232,7 +235,10 @@ export const checkPayWayPaymentStatus = asyncHandler(async (req, res) => {
   const data = await paywayResponse.json().catch(() => null);
 
   if (!paywayResponse.ok || !data) {
-    throw gatewayError("PayWay did not return a valid status response", 502);
+    return res.status(502).json({
+      success: false,
+      message: "PayWay did not return a valid status response",
+    });
   }
   if (data.status?.code !== "00") {
     return res.status(502).json({
